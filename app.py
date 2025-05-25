@@ -1,5 +1,7 @@
-from flask import Flask, request
+from dotenv import load_dotenv
+load_dotenv()
 
+from flask import Flask, request
 from config import Config
 from models import db
 from notes.routes import notes_bp

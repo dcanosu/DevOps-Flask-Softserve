@@ -38,3 +38,14 @@ pip install -r requirements.txt
 export FLASK_APP=app.py
 flask run
 ```
+
+## 🚧 Pending Tasks
+
+- **Implement database migrations:**  
+  Set up and run database migrations to manage your schema changes.
+
+- **Add use cases to the app:**  
+  Define and implement specific use cases or features that the application should support.
+
+- **Complete the login flow:**  
+  Finish implementing the user authentication and login process.
