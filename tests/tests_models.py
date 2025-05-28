@@ -1,7 +1,7 @@
 import unittest
 
 from app import create_app
-from models import db, Note
+from app import db, Note
 
 
 class NoteTests(unittest.TestCase):
