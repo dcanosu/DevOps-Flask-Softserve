@@ -15,7 +15,7 @@ pipeline {
             steps {
                 sh 'terraform --version'
                 sh 'pwd && ls -la'
-                sh 'ls -la infra/modules/ec2/'
+                sh 'ls -la infra'
                 
                 // Check AWS credentials
                 sh '''
@@ -29,7 +29,7 @@ pipeline {
             steps {
                 // Clean up any hanging processes and reinitialize
                 sh '''
-                    cd infra/modules/ec2
+                    cd infra
 										# Remove any existing lock files
 										rm -f .terraform.tfstate.lock.info
 										rm -f .terraform.lock.hcl
@@ -40,17 +40,17 @@ pipeline {
                 '''
                 
                 retry(3) {
-                    sh 'cd infra/modules/ec2 && terraform init'
+                    sh 'cd infra && terraform init'
                 }
                 
                 retry(3) {
-                    sh 'cd infra/modules/ec2 && terraform plan -out tfplan'
+                    sh 'cd infra && terraform plan -out tfplan'
                 }
                 
-                sh 'cd infra/modules/ec2 && terraform show -no-color tfplan > tfplan.txt'
+                sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
                 
                 // Show plan summary
-                sh 'cd infra/modules/ec2 && echo "=== PLAN SUMMARY ===" && terraform show tfplan | head -20'
+                sh 'cd infra && echo "=== PLAN SUMMARY ===" && terraform show tfplan | head -20'
             }
         }
         stage('Approval') {
@@ -61,7 +61,7 @@ pipeline {
            }
            steps {
                script {
-                    def plan = readFile 'infra/modules/ec2/tfplan.txt'
+                    def plan = readFile 'infra/tfplan.txt'
                     input message: "Do you want to apply the plan?",
                     parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
                }
@@ -69,11 +69,11 @@ pipeline {
        }
         stage('Apply') {
             steps {
-                sh 'cd infra/modules/ec2 && terraform apply -input=false tfplan'
+                sh 'cd infra && terraform apply -input=false tfplan'
                 
                 // Show created instance information
                 sh '''
-                    cd infra/modules/ec2
+                    cd infra
                     echo "=== DEPLOYMENT COMPLETED ==="
                     echo "Instance created with name: flask-app-dev"
                     terraform output || echo "No outputs defined"
@@ -83,10 +83,10 @@ pipeline {
     }
     post {
         always {
-            sh 'cd infra/modules/ec2 && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+            sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
         }
         success {
-            echo "EC2 instance 'flask-app-dev' deployed successfully!"
+            echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
         }
         failure {
             echo "Deployment failed. Check logs above."

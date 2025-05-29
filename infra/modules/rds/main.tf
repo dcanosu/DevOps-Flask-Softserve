@@ -1,4 +1,3 @@
-# RDS in Postgress
 resource "aws_db_instance" "db_app_flask" {
   identifier           = var.db_instance_identifier
   allocated_storage    = var.allocated_storage
@@ -10,7 +9,7 @@ resource "aws_db_instance" "db_app_flask" {
   password             = var.password
   # parameter_group_name = var.parameter_group_name
   skip_final_snapshot  = true
-  publicly_accessible  = false
+  publicly_accessible  = true
   deletion_protection  = false
 
   tags = {
