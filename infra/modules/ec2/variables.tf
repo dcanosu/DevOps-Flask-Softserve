@@ -19,6 +19,7 @@ variable "instance_type" {
 variable "instance_name" {
   description = "Tag to assign as the instance Name"
   type        = string
+	default     = "flask-app-dev"
 }
 
 variable "volume_size" {
