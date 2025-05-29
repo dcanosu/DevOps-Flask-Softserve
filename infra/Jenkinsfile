@@ -1,5 +1,4 @@
 pipeline {
-
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
     } 
@@ -7,19 +6,51 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
-
-   agent  any
-	  tools {
+    agent any
+    tools {
         terraform 'terraform'
     }
     stages {
+        stage('Verify Setup') {
+            steps {
+                sh 'terraform --version'
+                sh 'pwd && ls -la'
+                sh 'ls -la infra/modules/ec2/'
+                
+                // Check AWS credentials
+                sh '''
+                    echo "=== AWS CREDENTIALS CHECK ==="
+                    echo "AWS_ACCESS_KEY_ID is set: ${AWS_ACCESS_KEY_ID:+YES}"
+                    echo "AWS_SECRET_ACCESS_KEY is set: ${AWS_SECRET_ACCESS_KEY:+YES}"
+                '''
+            }
+        }
         stage('Plan') {
             steps {
-								sh 'terraform --version'
-                sh 'pwd; ls -la'
-                sh 'cd infra/modules/ec2 && terraform init'
-                sh 'cd infra/modules/ec2 && terraform plan -out tfplan'
+                // Clean up any hanging processes and reinitialize
+                sh '''
+                    cd infra/modules/ec2
+										# Remove any existing lock files
+										rm -f .terraform.tfstate.lock.info
+										rm -f .terraform.lock.hcl
+										rm -rf .terraform/
+										# Also clean the state file if it's corrupted
+										rm -f terraform.tfstate
+										echo "Cleaned previous terraform state and locks"
+                '''
+                
+                retry(3) {
+                    sh 'cd infra/modules/ec2 && terraform init'
+                }
+                
+                retry(3) {
+                    sh 'cd infra/modules/ec2 && terraform plan -out tfplan'
+                }
+                
                 sh 'cd infra/modules/ec2 && terraform show -no-color tfplan > tfplan.txt'
+                
+                // Show plan summary
+                sh 'cd infra/modules/ec2 && echo "=== PLAN SUMMARY ===" && terraform show tfplan | head -20'
             }
         }
         stage('Approval') {
@@ -28,21 +59,37 @@ pipeline {
                    equals expected: true, actual: params.autoApprove
                }
            }
-
            steps {
                script {
-                    def plan = readFile 'terraform/tfplan.txt'
+                    def plan = readFile 'infra/modules/ec2/tfplan.txt'
                     input message: "Do you want to apply the plan?",
                     parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
                }
            }
        }
-
         stage('Apply') {
             steps {
-							sh 'cd infra/modules/ec2 && terraform apply -input=false tfplan'
+                sh 'cd infra/modules/ec2 && terraform apply -input=false tfplan'
+                
+                // Show created instance information
+                sh '''
+                    cd infra/modules/ec2
+                    echo "=== DEPLOYMENT COMPLETED ==="
+                    echo "Instance created with name: flask-app-dev"
+                    terraform output || echo "No outputs defined"
+                '''
             }
         }
     }
-
-  }
+    post {
+        always {
+            sh 'cd infra/modules/ec2 && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+        }
+        success {
+            echo "EC2 instance 'flask-app-dev' deployed successfully!"
+        }
+        failure {
+            echo "Deployment failed. Check logs above."
+        }
+    }
+}
