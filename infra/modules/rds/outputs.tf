@@ -1,5 +1,5 @@
 output "status" {
-  description = "✅ Confirmation message for successful EC2 instance creation"
+  description = "✅ Confirmation message for successful RDS creation"
   value       = "🚀 DB for App_flask successfully created"
 }
 
