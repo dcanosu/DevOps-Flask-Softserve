@@ -20,3 +20,11 @@ module "ec2_app_flask" {
   aws_region            = var.aws_region 
   volume_size           = var.volume_size
 }
+
+module "rds_db_app_flask" {
+  source = "./modules/rds"
+  db_instance_identifier = var.db_instance_identifier
+  db_name = var.db_name
+  username = var.username
+  password = var.password
+}
