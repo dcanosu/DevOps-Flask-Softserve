@@ -9,23 +9,17 @@ pipeline {
     }
 
    agent  any
+	  tools {
+        terraform 'terraform'
+    }
     stages {
-        stage('checkout') {
-            steps {
-                 script{
-                        dir("terraform")
-                        {
-                            git "https://github.com/dcanosu/DevOps-Flask-Softserve.git"
-                        }
-                    }
-                }
-            }
-
         stage('Plan') {
             steps {
-                sh 'pwd;cd terraform/infra/modules/ec2 ; terraform init'
-                sh "pwd;cd terraform/infra/modules/ec2 ; terraform plan -out tfplan"
-                sh 'pwd;cd terraform/infra/modules/ec2 ; terraform show -no-color tfplan > tfplan.txt'
+								sh 'terraform --version'
+                sh 'pwd; ls -la'
+                sh 'cd infra/modules/ec2 && terraform init'
+                sh 'cd infra/modules/ec2 && terraform plan -out tfplan'
+                sh 'cd infra/modules/ec2 && terraform show -no-color tfplan > tfplan.txt'
             }
         }
         stage('Approval') {
@@ -46,7 +40,7 @@ pipeline {
 
         stage('Apply') {
             steps {
-                sh "pwd;cd terraform/ ; terraform apply -input=false tfplan"
+							sh 'cd infra/modules/ec2 && terraform apply -input=false tfplan'
             }
         }
     }
