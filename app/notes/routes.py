@@ -1,5 +1,5 @@
 from flask import redirect, render_template, request, url_for, Blueprint, flash, session
-from models import Note, db
+from ..models import Note, db
 
 notes_bp = Blueprint("notes", __name__)
 
