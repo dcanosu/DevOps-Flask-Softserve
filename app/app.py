@@ -2,10 +2,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, request
-from config import Config
-from models import db
-from notes.routes import notes_bp
-from auth.routes import auth_bp
+from .config import Config
+from .models import db
+from .notes.routes import notes_bp
+from .auth.routes import auth_bp
 
 
 def create_app(config_class=Config):
