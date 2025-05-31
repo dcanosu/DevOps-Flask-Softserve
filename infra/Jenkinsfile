@@ -75,15 +75,33 @@ pipeline {
 							script {
 								env.EC2_IP = sh(script: "terraform output -raw ec2_public_ip", returnStdout: true).trim()
 								env.RDS_ENDPOINT = sh(script: "terraform output -raw rds_endpoint", returnStdout: true).trim()
-								// If you have DB username/password in outputs, capture them similarly:
-								// env.DB_USER = sh(script: "terraform output -raw db_username", returnStdout: true).trim()
-								// env.DB_PASS = sh(script: "terraform output -raw db_password", returnStdout: true).trim()
 							}
 						}
-						echo "EC2_IP = ${env.EC2_IP}"
-						echo "RDS_ENDPOINT = ${env.RDS_ENDPOINT}"
+						sh """
+							cd infra
+							terraform output -raw ec2_private_key_pem > ../ec2-key.pem
+							chmod 600 ../ec2-key.pem
+						"""
+
+						// Display captured values
+						echo "EC2 Public IP: ${env.EC2_IP}"
+						echo "RDS Endpoint: ${env.RDS_ENDPOINT}"
+						echo "SSH private key saved to ec2-key.pem"
 					}
+			}
+
+			stage('Test SSH Connection') {
+				steps {
+					   sh """
+								ssh -i ec2-key.pem \\
+								-o StrictHostKeyChecking=no \\
+								-o UserKnownHostsFile=/dev/null \\
+								-o ConnectTimeout=30 \\
+								ubuntu@${env.EC2_IP} \\
+								'echo "✅ SSH connection successful!"'
+						"""
 				}
+			}
 		}
     post {
         always {
