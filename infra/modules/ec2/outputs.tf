@@ -4,11 +4,11 @@ output "status" {
 }
 
 output "instance_id" {
-  description = "Id of instance app_flask: "
+  description = "Id of instance app_flask"
   value       = aws_instance.app_flask.id
 }
 
 output "public_ip" {
-  description = "Public id of app_flask: "
+  description = "Public ip of app_flask"
   value       = aws_instance.app_flask.public_ip
 }

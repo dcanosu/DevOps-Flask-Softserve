@@ -14,8 +14,6 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                sh 'pwd && ls -la'
-                sh 'ls -la infra'
                 
                 // Check AWS credentials
                 sh '''
@@ -25,6 +23,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Plan') {
             steps {
 							withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
@@ -48,6 +47,7 @@ pipeline {
 							}
             }
         }
+
         stage('Approval') {
            when {
                not {
@@ -62,12 +62,29 @@ pipeline {
                }
            }
        }
+
         stage('Apply') {
             steps {
                 sh 'cd infra && terraform apply -input=false tfplan'
             }
         }
-    }
+
+				stage('Get Terraform Outputs') {
+					steps {
+						dir('infra') {
+							script {
+								env.EC2_IP = sh(script: "terraform output -raw ec2_public_ip", returnStdout: true).trim()
+								env.RDS_ENDPOINT = sh(script: "terraform output -raw rds_endpoint", returnStdout: true).trim()
+								// If you have DB username/password in outputs, capture them similarly:
+								// env.DB_USER = sh(script: "terraform output -raw db_username", returnStdout: true).trim()
+								// env.DB_PASS = sh(script: "terraform output -raw db_password", returnStdout: true).trim()
+							}
+						}
+						echo "EC2_IP = ${env.EC2_IP}"
+						echo "RDS_ENDPOINT = ${env.RDS_ENDPOINT}"
+					}
+				}
+		}
     post {
         always {
             sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
