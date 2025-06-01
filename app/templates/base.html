@@ -24,8 +24,12 @@
             <a href="{{ url_for('articles.home') }}" class="text-xl font-bold text-gray-800">Articles App</a>
             <div>
                 {% if session['user_id'] %}
+                    <a href="{{ url_for('articles.home') }}"
+                       class="px-4 py-2 hover:text-blue-600 mr-2 {% if request.endpoint == 'articles.home' %}font-bold text-blue-600{% else %}text-gray-700{% endif %}">All Articles</a>
+                    <a href="{{ url_for('articles.my_articles') }}"
+                       class="px-4 py-2 hover:text-blue-600 mr-2 {% if request.endpoint == 'articles.my_articles' %}font-bold text-blue-600{% else %}text-gray-700{% endif %}">My Articles</a>
                     <a href="{{ url_for('articles.create_article') }}"
-                       class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2">Create Article</a>
+                       class="px-4 py-2 hover:text-blue-600 mr-2 {% if request.endpoint == 'articles.create_article' %}font-bold text-blue-600{% else %}text-gray-700{% endif %}">Create Article</a>
                     <a href="{{ url_for('auth.logout') }}"
                        class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Logout</a>
                 {% else %}

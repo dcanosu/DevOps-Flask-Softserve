@@ -55,4 +55,4 @@ def login():
 def logout():
     session.pop("user_id", None)  # Clear user_id from session
     flash("Logout success", "success")
-    return redirect(url_for("auth.login"))
+    return redirect(url_for("articles.home"))

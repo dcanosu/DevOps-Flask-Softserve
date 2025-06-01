@@ -19,6 +19,20 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
+# Association table for Article and Category (Many-to-Many)
+article_categories_table = db.Table('article_categories',
+    db.Column('article_id', db.Integer, db.ForeignKey('articles.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('categories.id'), primary_key=True)
+)
+
+class Category(db.Model):
+    __tablename__ = 'categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<Category {self.name}>'
+
 class Article(db.Model):
     __tablename__ = 'articles'
     id = db.Column(db.Integer, primary_key=True)
@@ -26,6 +40,8 @@ class Article(db.Model):
     content = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.now())
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    categories = db.relationship('Category', secondary=article_categories_table,
+                                 lazy='subquery', backref=db.backref('articles', lazy=True))
 
     def __repr__(self):
         return f"<Article {self.id}: {self.title}>"

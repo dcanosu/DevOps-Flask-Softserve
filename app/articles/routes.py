@@ -1,5 +1,5 @@
 from flask import redirect, render_template, request, url_for, Blueprint, flash, session
-from ..models import Article, db  # Changed Note to Article
+from ..models import Article, db, Category # Changed Note to Article, added Category
 
 articles_bp = Blueprint("articles", __name__, template_folder='../templates')  # Renamed blueprint, added template_folder
 
@@ -27,14 +27,29 @@ def create_article():  # Renamed function
 
         if not len(content.strip()) > 10:
             flash("The content is too short, minimum 10 characters", "error")
-            return render_template("article_form.html", title=title, content=content) # Template rename
+            categories_from_db = Category.query.all()
+            return render_template("article_form.html", title=title, content=content, categories=categories_from_db) # Template rename
+
+        selected_category_ids = request.form.getlist('categories')
+        if not selected_category_ids:
+            flash("Please select at least one category.", "error")
+            categories_from_db = Category.query.all()
+            return render_template("article_form.html", title=title, content=content, categories=categories_from_db)
 
         article_db = Article(title=title, content=content, user_id=session['user_id'])
+        
+        if selected_category_ids:
+            for cat_id in selected_category_ids:
+                category = Category.query.get(int(cat_id))
+                if category:
+                    article_db.categories.append(category)
+        
         db.session.add(article_db)
         db.session.commit()
         flash("Article created", "success") # Updated message
         return redirect(url_for("articles.home")) # Updated url_for
-    return render_template("article_form.html") # Template rename
+    categories_from_db = Category.query.all()
+    return render_template("article_form.html", categories=categories_from_db) # Template rename
 
 
 @articles_bp.route("/edit-article/<int:id>", methods=["GET", "POST"])  # Renamed route
@@ -52,11 +67,39 @@ def edit_article(id):  # Renamed function
         content = request.form.get("content", "")
         article.title = title
         article.content = content
+
+        selected_category_ids = request.form.getlist('categories')
+        if not selected_category_ids:
+            flash("Please select at least one category.", "error")
+            all_categories = Category.query.all()
+            # Pass the current article and all categories back to the template
+            return render_template("edit_article.html", article=article, categories=all_categories)
+
+        # Clear existing categories and add new ones
+        article.categories.clear() 
+        if selected_category_ids:
+            for cat_id in selected_category_ids:
+                category = Category.query.get(int(cat_id))
+                if category:
+                    article.categories.append(category)
+
         db.session.commit()
         flash("Article updated", "success") # Updated message
         return redirect(url_for("articles.home")) # Updated url_for
 
-    return render_template("edit_article.html", article=article) # Template rename, pass article
+    all_categories = Category.query.all()
+    return render_template("edit_article.html", article=article, categories=all_categories) # Template rename, pass article and all categories
+
+
+
+@articles_bp.route("/my-articles")
+def my_articles():
+    if 'user_id' not in session:
+        flash("Please log in to view your articles.", "error")
+        return redirect(url_for('auth.login'))
+    
+    user_articles = Article.query.filter_by(user_id=session['user_id']).order_by(Article.created_at.desc()).all()
+    return render_template("my_articles.html", articles=user_articles)
 
 
 @articles_bp.route("/delete-article/<int:id>", methods=["POST"])  # Renamed route
