@@ -8,10 +8,15 @@
     {% for article in articles %}
     <div class="bg-white shadow-lg rounded-lg p-5">
         <h2 class="text-xl font-semibold text-gray-800 mb-2">{{ article.title }}</h2>
-        <p class="text-sm text-gray-500 mb-3">Created on {{ article.created_at.strftime('%d of %B') }}</p>
+        <p class="text-sm text-gray-500 mb-3">Created on {{ article.created_at.strftime('%d of %B') }}{% if session['user_id'] %} by {{ article.author.username }}{% endif %}</p>
         <p class="text-gray-700 mb-4">
-            {{ article.content[:140] }}{% if article.content|length > 140 %}...{% endif %}
+            {% if session['user_id'] %}
+                {{ article.content[:140] }}{% if article.content|length > 140 %}...{% endif %}
+            {% else %}
+                {{ article.content[:70] }}{% if article.content|length > 70 %}... <a href="{{ url_for('auth.login') }}" class="text-blue-500 hover:underline">Login to read more</a>{% endif %}
+            {% endif %}
         </p>
+        {% if session['user_id'] and session['user_id'] == article.author.id %}
         <div class="flex justify-end space-x-2">
             <a href="{{ url_for('articles.edit_article', id=article.id) }}"
                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600" title="Edit Article">Edit</a>
@@ -21,6 +26,7 @@
                     title="Delete Article">Delete</button>
             </form>
         </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

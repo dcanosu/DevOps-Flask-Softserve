@@ -6,13 +6,10 @@ articles_bp = Blueprint("articles", __name__, template_folder='../templates')  #
 
 @articles_bp.route("/")  # Assuming this will be the new home for articles
 def home():
-    if "user_id" not in session:
-        flash("You must log in to view the articles", "error")
-        return redirect(url_for("auth.login"))
-
-    articles = Article.query.all()  # Changed Note to Article
-    # We'll need to rename home.html or create a new articles_home.html later
-    return render_template("home.html", articles=articles) # Pass articles to template
+    # Fetch all articles, ordered by creation date (newest first)
+    # We can add a .limit(X) here if we want to show fewer to non-logged-in users later
+    articles = Article.query.order_by(Article.created_at.desc()).all()
+    return render_template("home.html", articles=articles)
 
 
 @articles_bp.route("/create-article", methods=["GET", "POST"])  # Renamed route
@@ -32,8 +29,7 @@ def create_article():  # Renamed function
             flash("The content is too short, minimum 10 characters", "error")
             return render_template("article_form.html", title=title, content=content) # Template rename
 
-        article_db = Article(title=title, content=content)
-        # If you add user_id to Article model: article_db.user_id = session["user_id"]
+        article_db = Article(title=title, content=content, user_id=session['user_id'])
         db.session.add(article_db)
         db.session.commit()
         flash("Article created", "success") # Updated message
@@ -47,10 +43,9 @@ def edit_article(id):  # Renamed function
         flash("You must be logged in to edit articles.", "error")
         return redirect(url_for("auth.login"))
     article = Article.query.get_or_404(id)  # Changed Note to Article
-    # Optional: Check if current user is the author of the article
-    # if article.user_id != session["user_id"]:
-    #     flash("You are not authorized to edit this article.", "error")
-    #     return redirect(url_for("articles.home"))
+    if article.user_id != session['user_id']:
+        flash("You are not authorized to edit this article.", "error")
+        return redirect(url_for("articles.home"))
 
     if request.method == "POST":
         title = request.form.get("title", "")
@@ -70,10 +65,9 @@ def delete_article(id):  # Renamed function
         flash("You must be logged in to delete articles.", "error")
         return redirect(url_for("auth.login"))
     article = Article.query.get_or_404(id)  # Changed Note to Article
-    # Optional: Check if current user is the author of the article
-    # if article.user_id != session["user_id"]:
-    #     flash("You are not authorized to delete this article.", "error")
-    #     return redirect(url_for("articles.home"))
+    if article.user_id != session['user_id']:
+        flash("You are not authorized to delete this article.", "error")
+        return redirect(url_for("articles.home"))
 
     db.session.delete(article)
     db.session.commit()
