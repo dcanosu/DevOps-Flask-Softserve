@@ -54,7 +54,7 @@ pipeline {
 
         stage('Approval') {
             when {
-                not { params.autoApprove }
+                expression { !params.autoApprove }
             }
             steps {
                 script {
