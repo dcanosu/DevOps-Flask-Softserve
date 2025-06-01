@@ -40,6 +40,11 @@ variable "delete_on_termination" {
   default     = true
 }
 
+variable "ssh_public_key" {
+  description = "SSH public key for EC2 access"
+  type        = string
+}
+
 # variable "subnet_id" {
 #   description = "The Subnet ID where the instance will be launched"
 #   type        = string

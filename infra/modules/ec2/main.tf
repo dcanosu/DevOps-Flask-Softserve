@@ -15,19 +15,13 @@ resource "aws_instance" "app_flask" {
   }
 }
 
-# Generate SSH key pair
-resource "tls_private_key" "app_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-# Create AWS key pair
 resource "aws_key_pair" "app_key" {
   key_name   = "flask-app-key"
-  public_key = tls_private_key.app_key.public_key_openssh
+  public_key = var.ssh_public_key
   
   tags = {
-    Name = "flask-app-key"
+    Name = "public-app-key"
+    Purpose = "Ansible"
   }
 }
 

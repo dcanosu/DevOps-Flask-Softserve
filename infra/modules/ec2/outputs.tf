@@ -12,9 +12,3 @@ output "public_ip" {
   description = "Public ip of app_flask"
   value       = aws_instance.app_flask.public_ip
 }
-
-output "private_key_pem" {
-  description = "Private key for SSH access"
-  value       = tls_private_key.app_key.private_key_pem
-  sensitive   = true
-}

@@ -5,6 +5,7 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+				SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
     }
     agent any
     tools {
@@ -14,13 +15,6 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                
-                // Check AWS credentials
-                sh '''
-                    echo "=== AWS CREDENTIALS CHECK ==="
-                    echo "AWS_ACCESS_KEY_ID is set: ${AWS_ACCESS_KEY_ID:+YES}"
-                    echo "AWS_SECRET_ACCESS_KEY is set: ${AWS_SECRET_ACCESS_KEY:+YES}"
-                '''
             }
         }
 
@@ -41,7 +35,7 @@ pipeline {
                 
 								sh 'cd infra && terraform init'
                 
-								sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -out tfplan'
+								sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
                 
                 sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
 							}
@@ -77,31 +71,12 @@ pipeline {
 								env.RDS_ENDPOINT = sh(script: "terraform output -raw rds_endpoint", returnStdout: true).trim()
 							}
 						}
-						sh """
-							cd infra
-							terraform output -raw ec2_private_key_pem > ../ec2-key.pem
-							chmod 600 ../ec2-key.pem
-						"""
 
 						// Display captured values
 						echo "EC2 Public IP: ${env.EC2_IP}"
 						echo "RDS Endpoint: ${env.RDS_ENDPOINT}"
-						echo "SSH private key saved to ec2-key.pem"
 					}
-			}
-
-			stage('Test SSH Connection') {
-				steps {
-					   sh """
-								ssh -i ec2-key.pem \\
-								-o StrictHostKeyChecking=no \\
-								-o UserKnownHostsFile=/dev/null \\
-								-o ConnectTimeout=30 \\
-								ubuntu@${env.EC2_IP} \\
-								'echo "✅ SSH connection successful!"'
-						"""
 				}
-			}
 		}
     post {
         always {
