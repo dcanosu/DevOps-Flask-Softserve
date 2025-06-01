@@ -6,15 +6,18 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
 				SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
+				SSH_PRIVATE_KEY_PATH    = credentials('ec2-ssh-key')
     }
     agent any
     tools {
         terraform 'terraform'
+				ansible 'ansible'
     }
     stages {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
+                sh 'ansible --version'
             }
         }
 
@@ -66,17 +69,29 @@ pipeline {
 				stage('Get Terraform Outputs') {
 					steps {
 						dir('infra') {
-							script {
-								env.EC2_IP = sh(script: "terraform output -raw ec2_public_ip", returnStdout: true).trim()
-								env.RDS_ENDPOINT = sh(script: "terraform output -raw rds_endpoint", returnStdout: true).trim()
-							}
+							sh 'terraform output -json > outputs.json'
 						}
 
-						// Display captured values
-						echo "EC2 Public IP: ${env.EC2_IP}"
-						echo "RDS Endpoint: ${env.RDS_ENDPOINT}"
+						script {
+							def tf = readJSON file: 'infra/outputs.json'
+							env.EC2_IP       = tf.ec2_public_ip.value
+							env.RDS_ENDPOINT = tf.rds_endpoint.value
+
+							 writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
+                                ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+								[flask_servers:vars]
+								rds_endpoint=${env.RDS_ENDPOINT}
+							"""
+						}
 					}
 				}
+
+				stage('Ansible: Test Connectivity') {
+            steps {
+                sh 'ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml'
+            }
+        }
 		}
     post {
         always {
