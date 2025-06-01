@@ -6,4 +6,4 @@ volume_size                  = 20
 db_instance_identifier = "flaskdb-dev"
 db_name                      = "flaskappdb"
 username                     = "flask"
-password                     = "flask"
+password                     = "flasflask"
