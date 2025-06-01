@@ -45,16 +45,7 @@ def login():
         if user and user.check_password(password):
             session["user_id"] = user.id  # Store user_id in session
             flash("Login successful!", "success")
-            # Assuming you have a 'notes.home' or similar route for authenticated users
-            # If not, change to a relevant route like 'index' or 'dashboard'
-            # For now, let's try to redirect to 'notes.home' as in the original code
-            # We might need to check if 'notes.home' exists or create it later
-            if 'notes.home' in current_app.url_map._rules_by_endpoint:
-                 return redirect(url_for("notes.home"))
-            else:
-                 # Fallback if notes.home doesn't exist, redirect to a generic page or handle error
-                 flash("Login successful, but notes.home not found. Redirecting to login.", "warning")
-                 return redirect(url_for("auth.login")) # Or a generic authenticated user page
+            return redirect(url_for("articles.home"))
         else:
             flash("Invalid username or password.", "error")
     return render_template("login.html")

@@ -21,11 +21,11 @@
     <!-- Navbar -->
     <nav class="bg-white shadow-sm py-4">
         <div class="container mx-auto flex justify-between items-center px-4">
-            <a href="{{ url_for('notes.home') }}" class="text-xl font-bold text-gray-800">Notes App</a>
+            <a href="{{ url_for('articles.home') }}" class="text-xl font-bold text-gray-800">Articles App</a>
             <div>
                 {% if session['user_id'] %}
-                    <a href="{{ url_for('notes.create_note') }}"
-                       class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2">Create Note</a>
+                    <a href="{{ url_for('articles.create_article') }}"
+                       class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2">Create Article</a>
                     <a href="{{ url_for('auth.logout') }}"
                        class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Logout</a>
                 {% else %}

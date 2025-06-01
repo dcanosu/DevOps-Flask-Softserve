@@ -1,6 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-# config is not directly used here anymore, app context will handle it via create_app
 
 db = SQLAlchemy()
 
@@ -19,11 +18,12 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
-class Note(db.Model):
+class Article(db.Model):
+    __tablename__ = 'articles'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.now())
 
     def __repr__(self):
-        return f"<Note {self.id}: {self.title}>"
+        return f"<Article {self.id}: {self.title}>"
