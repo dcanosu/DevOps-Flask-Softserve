@@ -33,6 +33,10 @@ class Category(db.Model):
     def __repr__(self):
         return f'<Category {self.name}>'
 
+VISIBILITY_PRIVATE = 'private'
+VISIBILITY_USER_PUBLIC = 'user_public'
+VISIBILITY_PUBLIC = 'public'
+
 class Article(db.Model):
     __tablename__ = 'articles'
     id = db.Column(db.Integer, primary_key=True)
@@ -42,6 +46,7 @@ class Article(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     categories = db.relationship('Category', secondary=article_categories_table,
                                  lazy='subquery', backref=db.backref('articles', lazy=True))
+    visibility = db.Column(db.String(20), nullable=False, default=VISIBILITY_PRIVATE)
 
     def __repr__(self):
         return f"<Article {self.id}: {self.title}>"

@@ -7,7 +7,17 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for article in articles %}
     <div class="bg-white shadow-lg rounded-lg p-5">
-        <h2 class="text-xl font-semibold text-gray-800 mb-2">{{ article.title }}</h2>
+        <h2 class="text-xl font-semibold text-gray-800 mb-2 flex items-center">
+            {{ article.title }}
+            {% if (article.visibility == 'public') or (article.visibility == 'user_public') or (article.visibility == 'private' and session.get('user_id') == article.user_id) %}
+            <span class="ml-2 capitalize text-xs font-semibold px-2 py-0.5 rounded-full
+                {% if article.visibility == 'public' %}bg-green-100 text-green-700
+                {% elif article.visibility == 'user_public' %}bg-blue-100 text-blue-700
+                {% elif article.visibility == 'private' %}bg-red-100 text-red-700
+                {% endif %}
+            ">{{ article.visibility.replace('_', '-') }}</span>
+            {% endif %}
+        </h2>
         <p class="text-sm text-gray-500 mb-3">Created on {{ article.created_at.strftime('%d of %B') }}{% if session['user_id'] %} by {{ article.author.username }}{% endif %}</p>
         <p class="text-gray-700 mb-4">
             {% if session['user_id'] %}

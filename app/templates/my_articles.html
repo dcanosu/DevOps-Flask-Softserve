@@ -11,9 +11,16 @@
         {% for article in articles %}
         <div class="bg-white shadow-lg rounded-lg p-5 flex flex-col justify-between">
             <div>
-                <h2 class="text-xl font-semibold text-gray-800 mb-2">{{ article.title }}</h2>
-                <p class="text-sm text-gray-500 mb-3">Created on {{ article.created_at.strftime('%d of %B') }}</p>
-                
+                <h2 class="text-xl font-semibold text-gray-800 mb-2 flex items-center">
+                    {{ article.title }}
+                    <span class="ml-2 capitalize text-xs font-semibold px-2 py-0.5 rounded-full
+                        {% if article.visibility == 'public' %}bg-green-100 text-green-700
+                        {% elif article.visibility == 'user_public' %}bg-blue-100 text-blue-700
+                        {% elif article.visibility == 'private' %}bg-red-100 text-red-700
+                        {% endif %}
+                    ">{{ article.visibility.replace('_', '-') }}</span>
+                </h2>
+                <p class="text-sm text-gray-500 mb-1">Created on {{ article.created_at.strftime('%d of %B') }}</p>
                 {% if article.categories %}
                 <div class="mb-3 flex flex-wrap gap-2">
                     {% for category in article.categories %}
