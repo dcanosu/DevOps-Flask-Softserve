@@ -1,11 +1,23 @@
-from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from .config import Config
+from werkzeug.security import generate_password_hash, check_password_hash
+# config is not directly used here anymore, app context will handle it via create_app
 
-app = Flask(__name__)
-app.config.from_object(Config)
+db = SQLAlchemy()
 
-db = SQLAlchemy(app)
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -15,13 +27,3 @@ class Note(db.Model):
 
     def __repr__(self):
         return f"<Note {self.id}: {self.title}>"
-
-# Función para crear las tablas
-def create_tables():
-    with app.app_context():
-        db.create_all()
-
-if __name__ == "__main__":
-    create_tables()
-    app.run(debug=True)
-    

@@ -6,7 +6,7 @@ notes_bp = Blueprint("notes", __name__)
 
 @notes_bp.route("/")
 def home():
-    if "user" not in session:
+    if "user_id" not in session:
         flash("You must log in to view the notes", "error")
         return redirect(url_for("auth.login"))
 
