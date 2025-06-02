@@ -1,70 +1,65 @@
 pipeline {
     agent any
 
-    parameters {
-        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
-    }
-
     environment {
-        AWS_REGION = 'us-east-1'
-    }
-
-    tools {
-        terraform 'terraform'
+        TFVARS_FILE = credentials('terraform-vars')
     }
 
     stages {
+        stage('Declarative: Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                sh 'pwd && ls -la'
+                sh 'pwd'
+                sh 'ls -la'
                 sh 'ls -la infra'
             }
         }
 
         stage('Verify TFVARS File') {
             steps {
-                withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
-                    sh "echo '=== Contents of TFVARS_FILE ==='"
-                    sh "cat \"${TFVARS_FILE}\""
+                withCredentials([file(credentialsId: 'terraform-vars', variable: 'TFVARS_FILE')]) {
+                    sh '''
+                        echo '=== Contents of TFVARS_FILE ==='
+                        cat $TFVARS_FILE
+                    '''
                 }
             }
         }
 
         stage('Plan') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester-credentials', region: "${env.AWS_REGION}") {
-                    sh '''
-                        cd infra
-                        rm -f .terraform.tfstate.lock.info
-                        rm -f .terraform.lock.hcl
-                        rm -rf .terraform/
-                        rm -f terraform.tfstate
-                        echo "Cleaned previous terraform state and locks"
-                    '''
-                    sh 'terraform init'
-                    sh "terraform plan -var-file=\"${TFVARS_FILE}\" -out tfplan"
-                    sh 'terraform show -no-color tfplan > tfplan.txt'
-                }
-            }
-        }
-
-        stage('Approval') {
-            when {
-                expression { !params.autoApprove }
-            }
-            steps {
-                script {
-                    def plan = readFile 'infra/tfplan.txt'
-                    input message: "Approve the following Terraform plan?\n\n${plan}"
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                    withEnv(['AWS_DEFAULT_REGION=sa-east-1']) {
+                        dir('infra') {
+                            sh 'terraform init'
+                            sh 'terraform plan -var-file=$TFVARS_FILE -out=tfplan'
+                            sh 'terraform show -no-color tfplan > tfplan.txt'
+                        }
+                    }
                 }
             }
         }
 
         stage('Apply') {
+            when {
+                expression {
+                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
+                }
+            }
             steps {
-                withAWS(credentials: 'lowestpermissiontester-credentials', region: "${env.AWS_REGION}") {
-                    sh 'cd infra && terraform apply -input=false tfplan'
+                input 'Do you want to apply these changes?'
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                    withEnv(['AWS_DEFAULT_REGION=sa-east-1']) {
+                        dir('infra') {
+                            sh 'terraform apply tfplan'
+                        }
+                    }
                 }
             }
         }
@@ -72,11 +67,10 @@ pipeline {
 
     post {
         always {
-            sh 'cd infra && rm -f tfplan tfplan.txt || true'
+            dir('infra') {
+                sh 'rm -f tfplan tfplan.txt'
+            }
             echo 'Deployment process finished.'
-        }
-        success {
-            echo '🚀 Deployment successful!'
         }
         failure {
             echo '💔 Deployment failed. Check logs above.'
