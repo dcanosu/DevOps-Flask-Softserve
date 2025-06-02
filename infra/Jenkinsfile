@@ -16,7 +16,11 @@ pipeline {
     stages {
         stage('Verify Setup') {
             steps {
+                // Ejecuta Terraform using the 'terraform' tool defined in Jenkins
+                tool name: 'terraform'
                 sh 'terraform --version'
+
+                // Ejecuta Ansible using the 'ansible' tool defined in Jenkins (which points to WSL)
                 script {
                     def ansibleHome = tool name: 'ansible'
                     sh "PATH=$PATH:${ansibleHome}/bin which ansible"
@@ -115,7 +119,7 @@ pipeline {
             echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
         }
         failure {
-            echo " Deployment failed. Check logs above."
+            echo "💔 Deployment failed. Check logs above."
         }
     }
 }
