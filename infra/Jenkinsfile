@@ -2,30 +2,19 @@ pipeline {
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
     }
-    environment {
-        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
-        SSH_PRIVATE_KEY_PATH    = "/home/danie/.ssh/id_rsa" // Asegúrate de que "danie" sea tu usuario en WSL
-    }
-    agent any
 
-    tools {
-        terraform 'terraform'
-        ansible 'ansible'
+    environment {
+        SSH_PUBLIC_KEY         = credentials('ec2-ssh-key-public')
+        SSH_PRIVATE_KEY_PATH   = "/home/danie/.ssh/id_rsa"
     }
+
+    agent any
 
     stages {
         stage('Verify Setup') {
             steps {
-                // Ejecuta Terraform using the 'terraform' tool defined in Jenkins
-                tool name: 'terraform'
-                sh 'terraform --version'
-
-                // Ejecuta Ansible using the 'ansible' tool defined in Jenkins (which points to WSL)
-                script {
-                    def ansibleHome = tool name: 'ansible'
-                    sh "PATH=$PATH:${ansibleHome}/bin which ansible"
-                    sh "PATH=$PATH:${ansibleHome}/bin ansible --version"
-                }
+                sh 'wsl terraform --version'
+                sh 'wsl ansible --version'
             }
         }
 
@@ -34,16 +23,18 @@ pipeline {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
                     withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
                         sh '''
-                            cd infra
-                            rm -f .terraform.tfstate.lock.info
-                            rm -f .terraform.lock.hcl
-                            rm -rf .terraform/
-                            rm -f terraform.tfstate
-                            echo "Cleaned previous terraform state and locks"
+                            wsl bash -c "
+                            cd infra &&
+                            rm -f .terraform.tfstate.lock.info &&
+                            rm -f .terraform.lock.hcl &&
+                            rm -rf .terraform/ &&
+                            rm -f terraform.tfstate &&
+                            echo 'Cleaned previous terraform state and locks'
+                            "
                         '''
-                        sh 'cd infra && terraform init'
-                        sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
-                        sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
+                        sh 'wsl bash -c "cd infra && terraform init"'
+                        sh 'wsl bash -c "cd infra && terraform plan -var-file=$TFVARS_FILE -var=\\"ssh_public_key=${SSH_PUBLIC_KEY}\\" -out tfplan"'
+                        sh 'wsl bash -c "cd infra && terraform show -no-color tfplan > tfplan.txt"'
                     }
                 }
             }
@@ -67,7 +58,7 @@ pipeline {
         stage('Apply') {
             steps {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    sh 'cd infra && terraform apply -input=false tfplan'
+                    sh 'wsl bash -c "cd infra && terraform apply -input=false tfplan"'
                 }
             }
         }
@@ -76,18 +67,19 @@ pipeline {
             steps {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
                     dir('infra') {
-                        sh 'terraform output -json > outputs.json'
+                        sh 'wsl bash -c "terraform output -json > outputs.json"'
                     }
                     script {
                         def tf = readJSON file: 'infra/outputs.json'
                         env.EC2_IP       = tf.ec2_public_ip.value
                         env.RDS_ENDPOINT = tf.rds_endpoint.value
-                        writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
-                            ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
-                            [flask_servers:vars]
-                            rds_endpoint=${env.RDS_ENDPOINT}
-                        """
+                        writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
+${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[flask_servers:vars]
+rds_endpoint=${env.RDS_ENDPOINT}
+"""
                     }
                 }
             }
@@ -96,7 +88,7 @@ pipeline {
         stage('Ansible: Test Connectivity') {
             steps {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    sh 'ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml'
+                    sh 'wsl ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml'
                 }
             }
         }
@@ -104,7 +96,7 @@ pipeline {
         stage('Cleanup') {
             steps {
                 always {
-                    sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+                    sh 'wsl bash -c "cd infra && rm -f tfplan tfplan.txt || echo No temp files to clean"'
                     echo 'Cleanup process finished.'
                 }
             }
