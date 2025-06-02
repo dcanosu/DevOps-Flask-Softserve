@@ -92,17 +92,24 @@ pipeline {
                 }
             }
         }
+
+        stage('Cleanup') {
+            always {
+                sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+                echo 'Cleanup process finished.'
+            }
+        }
     }
 
     post {
         always {
-            echo 'Running post actions.'
+            echo 'Deployment process finished.'
         }
         success {
             echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
         }
         failure {
-            echo "Deployment failed. Check logs above."
+            echo "💔 Deployment failed. Check logs above."
         }
     }
 }
