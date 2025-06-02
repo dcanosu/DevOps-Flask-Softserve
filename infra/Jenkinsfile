@@ -4,38 +4,28 @@ pipeline {
     }
     agent any
 
-    environment {
-        // Definimos los comandos WSL para Terraform y Ansible
-        TF_CMD = 'wsl terraform'
-        ANSIBLE_CMD = 'wsl ansible'
-        // Las claves SSH se seguirán manejando con credentials() para seguridad,
-        // pero la ruta SSH_PRIVATE_KEY_PATH ahora es una ruta WSL
-        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
-        SSH_PRIVATE_KEY_PATH    = "/home/danie/.ssh/id_rsa" // Asegúrate de que "danie" sea tu usuario en WSL
+    tools {
+        terraform 'terraform' // Asegúrate de que la herramienta Terraform esté configurada en Jenkins
+        ansible 'ansible'     // Asegúrate de que la herramienta Ansible apunte a C:\Users\danie\AppData\Local\Programs\Python\Python313\Scripts\ansible.exe
     }
 
-    // No necesitamos el bloque 'tools' si usamos 'wsl <command>' directamente
-    // tools {
-    //     terraform 'terraform'
-    //     ansible 'ansible'
-    // }
+    environment {
+        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
+        SSH_PRIVATE_KEY_PATH    = "C:\\Users\\danie\\.ssh\\id_rsa" // Ruta de Windows
+    }
 
     stages {
         stage('Verify Setup') {
             steps {
-                // Verificamos que Terraform y Ansible estén accesibles a través de WSL
-                sh "${TF_CMD} --version"
-                sh "${ANSIBLE_CMD} --version"
+                sh 'terraform --version'
+                sh 'ansible --version'
             }
         }
 
         stage('Plan') {
             steps {
-                // withAWS para inyectar las credenciales de AWS
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    // withCredentials para obtener el archivo .tfvars
                     withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
-                        // Limpieza de archivos temporales y estado de Terraform
                         sh '''
                             cd infra
                             rm -f .terraform.tfstate.lock.info
@@ -44,14 +34,9 @@ pipeline {
                             rm -f terraform.tfstate
                             echo "Cleaned previous terraform state and locks"
                         '''
-                        // Inicialización de Terraform
-                        sh "cd infra && ${TF_CMD} init"
-
-                        // Generación del plan de Terraform
-                        sh "cd infra && ${TF_CMD} plan -var-file=$TFVARS_FILE -var=\"ssh_public_key=${SSH_PUBLIC_KEY}\" -out tfplan"
-
-                        // Mostrar el plan en un archivo para la revisión
-                        sh "cd infra && ${TF_CMD} show -no-color tfplan > tfplan.txt"
+                        sh 'cd infra && terraform init'
+                        sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
+                        sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
                     }
                 }
             }
@@ -59,14 +44,12 @@ pipeline {
 
         stage('Approval') {
             when {
-                // Esta etapa se salta si autoApprove es true
                 not {
                     equals expected: true, actual: params.autoApprove
                 }
             }
             steps {
                 script {
-                    // Leer el plan de Terraform para mostrarlo en el input
                     def plan = readFile 'infra/tfplan.txt'
                     input message: "Do you want to apply the plan?",
                     parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
@@ -76,27 +59,22 @@ pipeline {
 
         stage('Apply') {
             steps {
-                // Aplicar el plan de Terraform
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    sh "cd infra && ${TF_CMD} apply -input=false tfplan"
+                    sh 'cd infra && terraform apply -input=false tfplan'
                 }
             }
         }
 
         stage('Get Terraform Outputs') {
             steps {
-                // Obtener las salidas de Terraform para Ansible
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
                     dir('infra') {
-                        sh "${TF_CMD} output -json > outputs.json"
+                        sh 'terraform output -json > outputs.json'
                     }
                     script {
-                        // Leer el JSON de salidas
                         def tf = readJSON file: 'infra/outputs.json'
                         env.EC2_IP       = tf.ec2_public_ip.value
                         env.RDS_ENDPOINT = tf.rds_endpoint.value
-
-                        // Escribir el archivo de inventario de Ansible con las IPs de EC2 y el endpoint de RDS
                         writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
                             ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
@@ -110,16 +88,14 @@ pipeline {
 
         stage('Ansible: Test Connectivity') {
             steps {
-                // Ejecutar el playbook de Ansible para probar la conectividad
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    sh "${ANSIBLE_CMD} -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml"
+                    sh "ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml"
                 }
             }
         }
 
         stage('Cleanup') {
             steps {
-                // Limpiar archivos temporales de Terraform
                 always {
                     sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
                     echo 'Cleanup process finished.'
@@ -129,15 +105,12 @@ pipeline {
     }
 
     post {
-        // Acciones que se ejecutan siempre al final del pipeline
         always {
             echo 'Deployment process finished.'
         }
-        // Mensaje de éxito
         success {
             echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
         }
-        // Mensaje de fallo
         failure {
             echo "💔 Deployment failed. Check logs above."
         }
