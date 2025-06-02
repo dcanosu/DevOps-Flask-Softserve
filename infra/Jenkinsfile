@@ -20,7 +20,7 @@ pipeline {
                 sh 'terraform --version'
                 script {
                     def ansibleHome = tool name: 'ansible'
-                    env.PATH = "${env.PATH};${ansibleHome}"
+                    env.PATH = "${ansibleHome};${env.PATH}"
                     sh 'which ansible'
                     sh 'ansible --version'
                 }
