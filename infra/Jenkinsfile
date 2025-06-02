@@ -68,7 +68,8 @@ pipeline {
     post {
         always {
             script {
-                dir('infra') {
+                def workspace = pwd()
+                dir("${workspace}/infra") {
                     sh 'rm -f tfplan tfplan.txt || true'
                 }
             }
