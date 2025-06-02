@@ -5,26 +5,27 @@ pipeline {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
     }
 
-    // No longer setting AWS credentials globally via environment block
-    // The 'withAWS' step will handle setting these for the relevant stages.
+    environment {
+        AWS_REGION = 'us-east-1' // Puedes mantener esto si quieres una región por defecto
+    }
 
     tools {
-        terraform 'terraform'
+        terraform 'terraform' // Asegúrate de que 'terraform' esté configurado en Jenkins > Manage Jenkins > Tools
     }
 
     stages {
+        // La etapa de checkout es manejada por la configuración del job de Jenkins (Pipeline script from SCM)
+        // No necesitamos un 'git' step explícito aquí a menos que quieras clonar otro repositorio o una subcarpeta específica.
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
                 sh 'pwd && ls -la'
-                sh 'ls -la infra'
+                sh 'ls -la infra' // Asume que 'infra' está en la raíz del repositorio clonado
             }
         }
 
         stage('Verify TFVARS File') {
             steps {
-                // This stage still uses 'terraform-tfvars' credential if it's a file credential
-                // and is not directly related to AWS authentication for Terraform operations.
                 withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
                     sh "echo '=== Contents of TFVARS_FILE ==='"
                     sh "cat \"${TFVARS_FILE}\""
@@ -32,51 +33,52 @@ pipeline {
             }
         }
 
-        // Wrap the 'Plan' and 'Apply' stages with 'withAWS' to use the specific credentials
-        withAWS(credentials: 'lowestpermissiontester-credentials') {
-            stage('Plan') {
-                steps {
-                    sh '''
-                        cd infra
-                        rm -f .terraform.tfstate.lock.info
-                        rm -f .terraform.lock.hcl
-                        rm -rf .terraform/
-                        rm -f terraform.tfstate
-                        echo "Cleaned previous terraform state and locks"
-                    '''
+        stage('AWS Terraform Operations') { // Etapa principal para operaciones de Terraform con credenciales AWS
+            steps {
+                withAWS(credentials: 'lowestpermissiontester-credentials', region: "${env.AWS_REGION}") {
+                    stage('Plan') { // Etapa anidada para el plan de Terraform
+                        steps {
+                            sh '''
+                                cd infra
+                                rm -f .terraform.tfstate.lock.info
+                                rm -f .terraform.lock.hcl
+                                rm -rf .terraform/
+                                rm -f terraform.tfstate
+                                echo "Cleaned previous terraform state and locks"
+                            '''
 
-                    sh 'cd infra && terraform init'
+                            sh 'terraform init' // Ya estamos en 'infra'
+                            sh "terraform plan -var-file=\"${TFVARS_FILE}\" -out tfplan"
+                            sh 'terraform show -no-color tfplan > tfplan.txt'
+                        }
+                    }
 
-                    // Explicitly specify the var-file
-                    sh "cd infra && terraform plan -var-file=\"terraform.tfvars\" -out tfplan"
+                    stage('Approval') { // Etapa anidada para la aprobación manual
+                        when {
+                            expression { !params.autoApprove }
+                        }
+                        steps {
+                            script {
+                                def plan = readFile 'infra/tfplan.txt'
+                                input message: "Approve the following Terraform plan?\n\n${plan}"
+                            }
+                        }
+                    }
 
-                    sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
-                }
-            }
-
-            stage('Approval') {
-                when {
-                    expression { !params.autoApprove }
-                }
-                steps {
-                    script {
-                        def plan = readFile 'infra/tfplan.txt'
-                        input message: "Approve the following Terraform plan?\n\n${plan}"
+                    stage('Apply') { // Etapa anidada para aplicar Terraform
+                        steps {
+                            sh 'cd infra && terraform apply -input=false tfplan'
+                        }
                     }
                 }
             }
-
-            stage('Apply') {
-                steps {
-                    sh 'cd infra && terraform apply -input=false tfplan'
-                }
-            }
-        } // End of withAWS block
+        } // Fin de la etapa 'AWS Terraform Operations'
     }
 
     post {
         always {
-            sh 'cd infra && rm -f tfplan tfplan.txt'
+            // Limpiar archivos de plan y estado si existen
+            sh 'cd infra && rm -f tfplan tfplan.txt || true' // '|| true' para evitar fallos si los archivos no existen
             echo 'Deployment process finished.'
         }
         success {
