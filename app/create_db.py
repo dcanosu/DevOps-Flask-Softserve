@@ -3,9 +3,7 @@ from .models import db, Category # Import db and Category from models.py
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
-        print("Tables created successfully")
-
+        print("Populating default categories (assuming tables are created by migrations)...")
         # Add default categories
         default_categories = ["Technology", "Science", "Travel", "Food", "Lifestyle", "Business"]
         for cat_name in default_categories:
