@@ -3,17 +3,14 @@ pipeline {
 
     environment {
         AWS_REGION = 'sa-east-1'
+        GIT_CREDENTIALS_ID = 'github-credentials'
+        SSH_PRIVATE_KEY_ID = 'ssh-private-key'
+        TFVARS_FILE_ID = 'terraform-tfvars'
     }
 
     tools {
         terraform 'terraform'
         ansible 'ansible'
-    }
-
-    credentials {
-        string(credentialsId: 'github-credentials', variable: 'GIT_CREDENTIALS')
-        string(credentialsId: 'ssh-private-key', variable: 'SSH_PRIVATE_KEY')
-        string(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')
     }
 
     stages {
@@ -25,7 +22,7 @@ pipeline {
                     doGenerateSubmoduleConfigurations: false,
                     extensions: [],
                     userRemoteConfigs: [[
-                        credentialsId: 'github-credentials',
+                        credentialsId: env.GIT_CREDENTIALS_ID,
                         url: 'https://github.com/dcanosu/DevOps-Flask-Softserve.git'
                     ]]
                 ])
@@ -41,13 +38,13 @@ pipeline {
 
         stage('Plan') {
             steps {
-                withAWS(credentials: '') { // Si no necesitas credenciales específicas de AWS aquí, deja vacío
-                    withCredentials([string(name: 'TFVARS_FILE', variable: 'TFVARS_CONTENT')]) {
+                withAWS(credentials: '') {
+                    withCredentials([string(name: 'TFVARS_FILE_ID', variable: 'TFVARS_CONTENT')]) {
                         script {
                             writeFile file: 'infra/terraform.tfvars', text: TFVARS_CONTENT
                         }
                         sh "cd infra && terraform init"
-                        sh "cd infra && terraform plan -var-file=terraform.tfvars -var=\"ssh_public_key=${SSH_PUBLIC_KEY}\" -out tfplan"
+                        sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=${SSH_PRIVATE_KEY}\" -out tfplan"
                     }
                 }
             }
@@ -61,7 +58,7 @@ pipeline {
 
         stage('Apply') {
             steps {
-                withAWS(region: env.AWS_REGION, credentials: '') { // Asegúrate de tener configuradas las credenciales de AWS en Jenkins
+                withAWS(region: env.AWS_REGION, credentials: '') {
                     sh "cd infra && terraform apply -input=false tfplan"
                 }
             }
@@ -76,7 +73,6 @@ pipeline {
                         def rds_endpoint = sh(script: 'cd infra && terraform output -raw rds_endpoint', returnStdout: true).trim()
                         echo "EC2 Public IP: ${ec2_ip}"
                         echo "RDS Endpoint: ${rds_endpoint}"
-                        // Puedes usar estas variables para Ansible
                         env.EC2_PUBLIC_IP = ec2_ip
                         env.RDS_ENDPOINT = rds_endpoint
                     }
@@ -86,7 +82,7 @@ pipeline {
 
         stage('Ansible: Test Connectivity') {
             steps {
-                withCredentials([string(name: 'SSH_PRIVATE_KEY', variable: 'ANSIBLE_PRIVATE_KEY')]) {
+                withCredentials([string(name: 'SSH_PRIVATE_KEY_ID', variable: 'ANSIBLE_PRIVATE_KEY')]) {
                     sh """
                         wsl ansible -i "${env.EC2_PUBLIC_IP}," --private-key="${ANSIBLE_PRIVATE_KEY}" -m ping all
                     """
@@ -97,7 +93,6 @@ pipeline {
         stage('Cleanup') {
             steps {
                 echo 'Deployment process finished.'
-                // Puedes agregar aquí lógica para destruir la infraestructura en caso de fallo o a petición
             }
         }
     }
