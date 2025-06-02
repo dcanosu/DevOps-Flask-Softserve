@@ -18,7 +18,11 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                sh 'ansible --version'
+                script {
+                    def ansibleHome = tool name: 'ansible'
+                    sh "PATH=$PATH:${ansibleHome} which ansible"
+                    sh "PATH=$PATH:${ansibleHome} ansible --version"
+                }
             }
         }
 
