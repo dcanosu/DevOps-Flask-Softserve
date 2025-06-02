@@ -20,9 +20,7 @@ pipeline {
                 sh 'terraform --version'
                 script {
                     def ansibleHome = tool name: 'ansible'
-                    env.PATH = "${ansibleHome};${env.PATH}"
-                    sh 'which ansible'
-                    sh 'ansible --version'
+                    bat "\"${ansibleHome}\\ansible.exe\" --version"
                 }
             }
         }
@@ -94,7 +92,7 @@ pipeline {
         stage('Ansible: Test Connectivity') {
             steps {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    sh "ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml"
+                    bat "\"${tool 'ansible'}\\ansible-playbook.exe\" -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml"
                 }
             }
         }
