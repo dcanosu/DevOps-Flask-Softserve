@@ -34,17 +34,17 @@ variable "instance_class" {
   default = "db.t3.micro"
 }
 
-//variable "username" {
+variable "username" {
   description = "Username for the master DB user."
   type    = string
-  default = "admin"
+  //default = "admin"//
 }
 
 variable "password" {
   description = "Password for the master DB user. Marked as sensitive for security."
   type      = string
   sensitive = true
-}//
+}
 
 # variable "parameter_group_name" {
 #   description = "The name of the DB parameter group to associate with this instance."
