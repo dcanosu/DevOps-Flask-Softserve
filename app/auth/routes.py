@@ -44,7 +44,7 @@ def login():
 
         if user and user.check_password(password):
             session["user_id"] = user.id  # Store user_id in session
-            flash("Login successful!", "success")
+            flash("Welcome back!", "success")
             return redirect(url_for("articles.home"))
         else:
             flash("Invalid username or password.", "error")
@@ -54,5 +54,5 @@ def login():
 @auth_bp.route("/logout")
 def logout():
     session.pop("user_id", None)  # Clear user_id from session
-    flash("Logout success", "success")
+    flash("You've been logged out.", "success")
     return redirect(url_for("articles.home"))

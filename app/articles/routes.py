@@ -1,4 +1,4 @@
-from flask import redirect, render_template, request, url_for, Blueprint, flash, session
+from flask import redirect, render_template, request, url_for, Blueprint, flash, session, jsonify
 from ..models import Article, db, Category, User, VISIBILITY_PRIVATE, VISIBILITY_USER_PUBLIC, VISIBILITY_PUBLIC # Added User for user_map
 
 articles_bp = Blueprint("articles", __name__, template_folder='../templates')  # Renamed blueprint, added template_folder
@@ -51,13 +51,13 @@ def create_article():  # Renamed function
             categories_from_db = Category.query.all()
             # Pass visibility back to form if validation fails
             visibility = request.form.get('visibility', VISIBILITY_PRIVATE)
-            return render_template("article_form.html", title=title, content=content, categories=categories_from_db, current_visibility=visibility)
+            return render_template("article_form.html", title=title, content=content, categories=categories_from_db, current_visibility=visibility, form_title="Create Article")
 
         visibility = request.form.get('visibility', VISIBILITY_PRIVATE)
         if visibility not in [VISIBILITY_PRIVATE, VISIBILITY_USER_PUBLIC, VISIBILITY_PUBLIC]:
             flash("Invalid visibility value selected.", "error")
             categories_from_db = Category.query.all()
-            return render_template("article_form.html", title=title, content=content, categories=categories_from_db, current_visibility=visibility)
+            return render_template("article_form.html", title=title, content=content, categories=categories_from_db, current_visibility=visibility, form_title="Create Article")
 
         article_db = Article(title=title, content=content, user_id=session['user_id'], visibility=visibility)
         
@@ -73,7 +73,7 @@ def create_article():  # Renamed function
         return redirect(url_for("articles.home")) # Updated url_for
     categories_from_db = Category.query.all()
     # Pass default visibility for new form
-    return render_template("article_form.html", categories=categories_from_db, current_visibility=VISIBILITY_PRIVATE) # Template rename
+    return render_template("article_form.html", categories=categories_from_db, current_visibility=VISIBILITY_PRIVATE, form_title="Create Article") # Template rename
 
 
 @articles_bp.route("/edit-article/<int:id>", methods=["GET", "POST"])  # Renamed route
@@ -97,13 +97,13 @@ def edit_article(id):  # Renamed function
             flash("Please select at least one category.", "error")
             all_categories = Category.query.all()
             # Pass the current article, all categories, and current visibility back to the template
-            return render_template("edit_article.html", article=article, categories=all_categories)
+            return render_template("article_form.html", title=article.title, content=article.content, categories=all_categories, current_visibility=article.visibility, selected_category_ids=[cat.id for cat in article.categories], form_title="Edit Article")
 
         new_visibility = request.form.get('visibility', article.visibility) # Default to current if not provided
         if new_visibility not in [VISIBILITY_PRIVATE, VISIBILITY_USER_PUBLIC, VISIBILITY_PUBLIC]:
             flash("Invalid visibility value selected.", "error")
             all_categories = Category.query.all()
-            return render_template("edit_article.html", article=article, categories=all_categories)
+            return render_template("article_form.html", title=article.title, content=article.content, categories=all_categories, current_visibility=article.visibility, selected_category_ids=[cat.id for cat in article.categories], form_title="Edit Article")
         article.visibility = new_visibility
 
         # Clear existing categories and add new ones
@@ -119,8 +119,7 @@ def edit_article(id):  # Renamed function
         return redirect(url_for("articles.home")) # Updated url_for
 
     all_categories = Category.query.all()
-    # The form edit_article.html directly uses article.visibility, so no need to pass it separately here for GET requests
-    return render_template("edit_article.html", article=article, categories=all_categories) # Template rename, pass article and all categories
+    return render_template("article_form.html", title=article.title, content=article.content, categories=all_categories, current_visibility=article.visibility, selected_category_ids=[cat.id for cat in article.categories], form_title="Edit Article")
 
 
 
@@ -148,3 +147,34 @@ def delete_article(id):  # Renamed function
     db.session.commit()
     flash("Article deleted", "success") # Updated message
     return redirect(url_for("articles.home")) # Updated url_for
+
+
+@articles_bp.route("/api/article_activity")
+def article_activity():
+    """
+    Provides data for article creation activity.
+    Returns a JSON list of objects, each with 'date' (YYYY-MM-DD) and 'count'.
+    """
+    try:
+        # Query to get the count of articles created on each date
+        # db.func.date extracts the date part from the DateTime field
+        activity_query = (
+            db.session.query(
+                db.func.date(Article.created_at).label("creation_date"),
+                db.func.count(Article.id).label("article_count"),
+            )
+            .group_by(db.func.date(Article.created_at))
+            .order_by(db.func.date(Article.created_at)) # Consistent ordering
+            .all()
+        )
+
+        # Format data for JSON response
+        activity_data = [
+            {"date": str(row.creation_date), "count": row.article_count}
+            for row in activity_query
+        ]
+        return jsonify(activity_data)
+    except Exception as e:
+        # In a production app, you'd log this error
+        # For debugging, you might print(f"Error fetching article activity: {e}")
+        return jsonify({"error": "Could not retrieve article activity data"}), 500

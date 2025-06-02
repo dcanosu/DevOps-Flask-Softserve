@@ -14,6 +14,34 @@
             color: #333;
         }
     </style>
+    <style>
+      .fc .fc-toolbar-title {
+        font-size: 1.0em !important; /* Reduced from 1.1em for smaller title */
+      }
+      .fc .fc-col-header-cell-cushion {
+        font-size: 0.8em !important; /* For Sun, Mon, etc. */
+      }
+      .fc .fc-daygrid-day-number {
+        font-size: 0.9em !important; /* For day numbers 1, 2, 3 */
+      }
+      .fc .fc-event-title {
+        font-size: 0.9em !important; /* For the event text itself, e.g., the '1' */
+      }
+
+      .fc .fc-prev-button,
+      .fc .fc-next-button {
+        background-color: #0d9488 !important; /* teal-600 */
+        color: white !important;
+        border: none !important;
+        border-radius: 0 !important; /* Square corners */
+        /* padding: 0.3em 0.5em !important; */ /* Using default padding for now */
+      }
+
+      .fc .fc-prev-button:hover,
+      .fc .fc-next-button:hover {
+        background-color: #0f766e !important; /* teal-700 */
+      }
+    </style>
 </head>
 
 <body class="min-h-screen flex flex-col">
@@ -25,18 +53,18 @@
             <div>
                 {% if session['user_id'] %}
                     <a href="{{ url_for('articles.home') }}"
-                       class="px-4 py-2 hover:text-blue-600 mr-2 {% if request.endpoint == 'articles.home' %}font-bold text-blue-600{% else %}text-gray-700{% endif %}">All Articles</a>
+                       class="px-4 py-2 mr-2 {% if request.endpoint == 'articles.home' %}font-bold text-teal-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">All Articles</a>
                     <a href="{{ url_for('articles.my_articles') }}"
-                       class="px-4 py-2 hover:text-blue-600 mr-2 {% if request.endpoint == 'articles.my_articles' %}font-bold text-blue-600{% else %}text-gray-700{% endif %}">My Articles</a>
+                       class="px-4 py-2 mr-2 {% if request.endpoint == 'articles.my_articles' %}font-bold text-teal-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">My Articles</a>
                     <a href="{{ url_for('articles.create_article') }}"
-                       class="px-4 py-2 hover:text-blue-600 mr-2 {% if request.endpoint == 'articles.create_article' %}font-bold text-blue-600{% else %}text-gray-700{% endif %}">Create Article</a>
+                       class="px-4 py-2 mr-2 {% if request.endpoint == 'articles.create_article' %}font-bold text-teal-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">Create Article</a>
                     <a href="{{ url_for('auth.logout') }}"
-                       class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Logout</a>
+                       class="px-4 py-2 text-gray-500 hover:text-gray-700 transition duration-150 ease-in-out">Logout</a>
                 {% else %}
                     <a href="{{ url_for('auth.login') }}"
-                       class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 mr-2">Login</a>
+                       class="px-4 py-2 text-gray-500 hover:text-gray-700 transition duration-150 ease-in-out mr-2">Login</a>
                     <a href="{{ url_for('auth.register') }}"
-                       class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">Register</a>
+                       class="px-4 py-2 text-gray-500 hover:text-gray-700 transition duration-150 ease-in-out">Register</a>
                 {% endif %}
             </div>
         </div>
@@ -48,8 +76,7 @@
     <div class="container mx-auto my-4 px-4">
         {% for category, message in messages %}
         <div
-            class="p-3 mb-2 rounded-lg
-                {% if category == 'success' %}bg-green-100 text-green-800{% elif category == 'error' %}bg-red-100 text-red-800{% elif category == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+            class="px-4 py-3 mb-3 border text-center max-w-xl mx-auto shadow-lg {% if category == 'success' %}bg-teal-50 border-teal-300 text-teal-700 font-medium{% elif category == 'error' %}bg-red-50 border-red-300 text-red-700 font-medium{% elif category == 'warning' %}bg-yellow-50 border-yellow-300 text-yellow-700 font-medium{% else %}bg-blue-50 border-blue-300 text-blue-700 font-medium{% endif %}">
             {{ message }}
         </div>
         {% endfor %}
@@ -58,12 +85,84 @@
     {% endwith %}
 
     <!-- Main Content -->
-    <main class="flex-grow container mx-auto py-6 px-4">
+    <main class="flex-grow container mx-auto py-6 px-4 {% block main_classes %}{% endblock %}">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
     <footer class="bg-white shadow-inner text-center p-4 mt-6 text-sm text-gray-500"></footer>
+    <div id="activity-calendar-container" class="fixed bottom-4 right-4 w-[20rem] h-[18rem] md:w-[22rem] md:h-[20rem] bg-white p-3 shadow-2xl border border-gray-300 z-50 rounded-md" style="--fc-font-size: 0.75em;"></div>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('activity-calendar-container');
+        if (calendarEl) { // Only proceed if the calendar container element exists
+          fetch('/api/article_activity')
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
+              }
+              return response.json();
+            })
+            .then(data => {
+              if (data.error) {
+                console.error('Error from API fetching article activity:', data.error);
+                calendarEl.innerHTML = '<p class="text-center text-red-500 p-4">Could not load activity data.</p>';
+                return;
+              }
+              const events = data.map(item => ({
+                date: item.date,
+                title: item.count.toString(), // Just the number for display
+                allDay: true,
+                color: '#0d9488', // Tailwind's teal-600
+                textColor: '#f0fdfa', // Tailwind's teal-50
+                extendedProps: {
+                  fullText: item.count + (item.count === 1 ? ' article created' : ' articles created') // For tooltip
+                }
+              }));
+
+              var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                  left: 'prev',
+                  center: 'title',
+                  right: 'next'
+                },
+                events: events,
+                aspectRatio: 1.5, // Adjust for desired width/height proportion
+                buttonText: {
+                    prev: '<',
+                    next: '>'
+                },
+                eventMouseEnter: function(mouseEnterInfo) {
+                  if (mouseEnterInfo.event.extendedProps && mouseEnterInfo.event.extendedProps.fullText) {
+                    let tooltip = document.getElementById('fc-custom-tooltip');
+                    tooltip.innerHTML = mouseEnterInfo.event.extendedProps.fullText;
+                    tooltip.style.display = 'block';
+                    // Position tooltip near mouse - adjust offsets as needed
+                    tooltip.style.left = (mouseEnterInfo.jsEvent.pageX + 10) + 'px';
+                    tooltip.style.top = (mouseEnterInfo.jsEvent.pageY + 10) + 'px';
+                  }
+                },
+                eventMouseLeave: function(mouseLeaveInfo) {
+                  let tooltip = document.getElementById('fc-custom-tooltip');
+                  tooltip.style.display = 'none';
+                }
+                // Additional styling for FullCalendar elements (buttons, etc.)
+                // might require custom CSS overrides if Tailwind classes aren't directly applicable.
+              });
+              calendar.render();
+            })
+            .catch(error => {
+              console.error('Error fetching or initializing calendar:', error);
+              if (calendarEl) {
+                calendarEl.innerHTML = '<p class="text-center text-red-500 p-4">Error loading calendar.</p>';
+              }
+            });
+        }
+      });
+    </script>
+    <div id="fc-custom-tooltip" class="absolute hidden bg-gray-700 text-white text-xs py-1 px-2 rounded-md shadow-lg z-[100] pointer-events-none"></div>
 </body>
 
 </html>
