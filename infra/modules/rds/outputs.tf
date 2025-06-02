@@ -3,6 +3,6 @@ output "status" {
   value       = "🚀 DB for App_flask successfully created"
 }
 
-output "rds_endpoint" {
+output "endpoint" {
   value = aws_db_instance.db_app_flask.endpoint
 }

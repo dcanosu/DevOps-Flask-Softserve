@@ -1,0 +1,19 @@
+- name: Test SSH and RDS connectivity
+  hosts: flask_servers
+  gather_facts: no
+
+  tasks:
+    - name: Verify SSH connectivity to EC2
+      ping:
+
+    - name: Check TCP connectivity from EC2 to RDS (port 5432)
+      wait_for:
+        host: "{{ rds_endpoint }}"
+        port: 5432
+        timeout: 10
+      register: rds_check
+
+    - name: Fail if RDS port check did not succeed
+      fail:
+        msg: "Cannot reach RDS at {{ rds_endpoint }}:5432"
+      when: not rds_check.elapsed < 10

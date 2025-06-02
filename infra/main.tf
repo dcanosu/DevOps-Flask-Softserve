@@ -14,7 +14,9 @@ provider "aws" {
 }
 
 module "ec2_app_flask" {
-  source = "./modules/ec2" # Path to your EC2 module
+  source = "./modules/ec2"
+
+	ssh_public_key     = var.ssh_public_key
   ami_id                = var.ami_id
   instance_name         = var.instance_name
   aws_region            = var.aws_region 

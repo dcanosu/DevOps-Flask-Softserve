@@ -5,26 +5,22 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+				SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
+				SSH_PRIVATE_KEY_PATH    = credentials('ec2-ssh-key')
     }
     agent any
     tools {
         terraform 'terraform'
+				ansible 'ansible'
     }
     stages {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                sh 'pwd && ls -la'
-                sh 'ls -la infra'
-                
-                // Check AWS credentials
-                sh '''
-                    echo "=== AWS CREDENTIALS CHECK ==="
-                    echo "AWS_ACCESS_KEY_ID is set: ${AWS_ACCESS_KEY_ID:+YES}"
-                    echo "AWS_SECRET_ACCESS_KEY is set: ${AWS_SECRET_ACCESS_KEY:+YES}"
-                '''
+                sh 'ansible --version'
             }
         }
+
         stage('Plan') {
             steps {
 							withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
@@ -42,12 +38,13 @@ pipeline {
                 
 								sh 'cd infra && terraform init'
                 
-								sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -out tfplan'
+								sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
                 
                 sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
 							}
             }
         }
+
         stage('Approval') {
            when {
                not {
@@ -62,12 +59,40 @@ pipeline {
                }
            }
        }
+
         stage('Apply') {
             steps {
                 sh 'cd infra && terraform apply -input=false tfplan'
             }
         }
-    }
+
+				stage('Get Terraform Outputs') {
+					steps {
+						dir('infra') {
+							sh 'terraform output -json > outputs.json'
+						}
+
+						script {
+							def tf = readJSON file: 'infra/outputs.json'
+							env.EC2_IP       = tf.ec2_public_ip.value
+							env.RDS_ENDPOINT = tf.rds_endpoint.value
+
+							 writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
+                                ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+								[flask_servers:vars]
+								rds_endpoint=${env.RDS_ENDPOINT}
+							"""
+						}
+					}
+				}
+
+				stage('Ansible: Test Connectivity') {
+            steps {
+                sh 'ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml'
+            }
+        }
+		}
     post {
         always {
             sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
