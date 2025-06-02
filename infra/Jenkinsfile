@@ -115,7 +115,7 @@ pipeline {
             echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
         }
         failure {
-            echo "💔 Deployment failed. Check logs above."
+            echo " Deployment failed. Check logs above."
         }
     }
 }
