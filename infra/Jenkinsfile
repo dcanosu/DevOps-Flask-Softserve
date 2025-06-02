@@ -6,7 +6,7 @@ pipeline {
 
     tools {
         terraform 'terraform' // Asegúrate de que la herramienta Terraform esté configurada en Jenkins
-        ansible 'ansible'     // Asegúrate de que la herramienta Ansible esté configurada en Jenkins
+        ansible 'ansible'     // Asegúrate de que la herramienta Ansible esté configurada en Jenkins (apuntando a la ubicación de Windows)
     }
 
     environment {
@@ -18,7 +18,7 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                bat "\"C:\\Users\\danie\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\ansible.exe\" --version"
+                sh 'bash -c "ansible --version"'
             }
         }
 
@@ -89,7 +89,7 @@ pipeline {
         stage('Ansible: Test Connectivity') {
             steps {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
-                    bat "\"C:\\Users\\danie\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\ansible-playbook.exe\" -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml"
+                    sh 'bash -c "ansible-playbook -i /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/inventory.ini /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/playbooks/test_connections.yml"'
                 }
             }
         }
