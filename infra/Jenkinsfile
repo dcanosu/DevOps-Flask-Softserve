@@ -6,7 +6,7 @@ pipeline {
 
     tools {
         terraform 'terraform' // Asegúrate de que la herramienta Terraform esté configurada en Jenkins
-        ansible 'ansible'     // Asegúrate de que la herramienta Ansible apunte a C:\Users\danie\AppData\Local\Programs\Python\Python313\Scripts\ansible.exe
+        ansible 'ansible'     // Asegúrate de que la herramienta Ansible esté configurada en Jenkins
     }
 
     environment {
@@ -18,10 +18,7 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                script {
-                    def ansibleHome = tool name: 'ansible'
-                    bat "\"${ansibleHome}\\ansible.exe\" --version"
-                }
+                bat "\"${tool 'ansible'}\\ansible.exe\" --version"
             }
         }
 
