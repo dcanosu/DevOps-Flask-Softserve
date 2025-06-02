@@ -69,8 +69,12 @@ pipeline {
         always {
             script {
                 def workspace = pwd()
-                dir("${workspace}/infra") {
-                    sh 'rm -f tfplan tfplan.txt || true'
+                try {
+                    dir("${workspace}/infra") {
+                        sh 'rm -f tfplan tfplan.txt || true'
+                    }
+                } catch (Exception e) {
+                    echo "Error cleaning up Terraform files: ${e}"
                 }
             }
             echo 'Deployment process finished.'
