@@ -24,7 +24,7 @@ pipeline {
 
         stage('Plan') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
                     withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
                         sh '''
                             cd infra
@@ -59,7 +59,7 @@ pipeline {
 
         stage('Apply') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
                     sh 'cd infra && terraform apply -input=false tfplan'
                 }
             }
@@ -67,7 +67,7 @@ pipeline {
 
         stage('Get Terraform Outputs') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
                     dir('infra') {
                         sh 'terraform output -json > outputs.json'
                     }
@@ -88,7 +88,7 @@ pipeline {
 
         stage('Ansible: Test Connectivity') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
                     sh 'wsl ansible-playbook -i /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/inventory.ini /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/playbooks/test_connections.yml'
                 }
             }
