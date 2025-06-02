@@ -67,10 +67,12 @@ pipeline {
 
     post {
         always {
-            dir('infra') {
-                sh 'rm -f tfplan tfplan.txt'
+            node {
+                dir('infra') {
+                    sh 'rm -f tfplan tfplan.txt'
+                }
+                echo 'Deployment process finished.'
             }
-            echo 'Deployment process finished.'
         }
         failure {
             echo '💔 Deployment failed. Check logs above.'
