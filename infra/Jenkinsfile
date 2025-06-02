@@ -26,7 +26,7 @@ pipeline {
                 withCredentials([file(credentialsId: 'terraform-vars', variable: 'TFVARS_FILE')]) {
                     sh '''
                         echo '=== Contents of TFVARS_FILE ==='
-                        cat $TFVARS_FILE
+                        cat "$TFVARS_FILE"
                     '''
                 }
             }
@@ -34,11 +34,11 @@ pipeline {
 
         stage('Plan') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'lowestpermissiontester-credentials']]) {
                     withEnv(['AWS_DEFAULT_REGION=sa-east-1']) {
                         dir('infra') {
                             sh 'terraform init'
-                            sh 'terraform plan -var-file=$TFVARS_FILE -out=tfplan'
+                            sh "terraform plan -var-file=\"$TFVARS_FILE\" -out=tfplan"
                             sh 'terraform show -no-color tfplan > tfplan.txt'
                         }
                     }
@@ -54,10 +54,10 @@ pipeline {
             }
             steps {
                 input 'Do you want to apply these changes?'
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'lowestpermissiontester-credentials']]) {
                     withEnv(['AWS_DEFAULT_REGION=sa-east-1']) {
                         dir('infra') {
-                            sh 'terraform apply tfplan'
+                            sh 'terraform apply -input=false tfplan'
                         }
                     }
                 }
@@ -67,12 +67,10 @@ pipeline {
 
     post {
         always {
-            node {
-                dir('infra') {
-                    sh 'rm -f tfplan tfplan.txt'
-                }
-                echo 'Deployment process finished.'
+            dir('infra') {
+                sh 'rm -f tfplan tfplan.txt || true'
             }
+            echo 'Deployment process finished.'
         }
         failure {
             echo '💔 Deployment failed. Check logs above.'
