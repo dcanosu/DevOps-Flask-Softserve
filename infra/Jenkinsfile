@@ -94,9 +94,11 @@ pipeline {
         }
 
         stage('Cleanup') {
-            always {
-                sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
-                echo 'Cleanup process finished.'
+            steps {
+                always {
+                    sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+                    echo 'Cleanup process finished.'
+                }
             }
         }
     }
