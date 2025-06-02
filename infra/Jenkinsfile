@@ -6,21 +6,19 @@ pipeline {
     }
 
     environment {
-        AWS_REGION = 'us-east-1' // Puedes mantener esto si quieres una región por defecto
+        AWS_REGION = 'us-east-1'
     }
 
     tools {
-        terraform 'terraform' // Asegúrate de que 'terraform' esté configurado en Jenkins > Manage Jenkins > Tools
+        terraform 'terraform'
     }
 
     stages {
-        // La etapa de checkout es manejada por la configuración del job de Jenkins (Pipeline script from SCM)
-        // No necesitamos un 'git' step explícito aquí a menos que quieras clonar otro repositorio o una subcarpeta específica.
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
                 sh 'pwd && ls -la'
-                sh 'ls -la infra' // Asume que 'infra' está en la raíz del repositorio clonado
+                sh 'ls -la infra'
             }
         }
 
@@ -33,52 +31,48 @@ pipeline {
             }
         }
 
-        stage('AWS Terraform Operations') { // Etapa principal para operaciones de Terraform con credenciales AWS
+        stage('Plan') {
             steps {
                 withAWS(credentials: 'lowestpermissiontester-credentials', region: "${env.AWS_REGION}") {
-                    stage('Plan') { // Etapa anidada para el plan de Terraform
-                        steps {
-                            sh '''
-                                cd infra
-                                rm -f .terraform.tfstate.lock.info
-                                rm -f .terraform.lock.hcl
-                                rm -rf .terraform/
-                                rm -f terraform.tfstate
-                                echo "Cleaned previous terraform state and locks"
-                            '''
-
-                            sh 'terraform init' // Ya estamos en 'infra'
-                            sh "terraform plan -var-file=\"${TFVARS_FILE}\" -out tfplan"
-                            sh 'terraform show -no-color tfplan > tfplan.txt'
-                        }
-                    }
-
-                    stage('Approval') { // Etapa anidada para la aprobación manual
-                        when {
-                            expression { !params.autoApprove }
-                        }
-                        steps {
-                            script {
-                                def plan = readFile 'infra/tfplan.txt'
-                                input message: "Approve the following Terraform plan?\n\n${plan}"
-                            }
-                        }
-                    }
-
-                    stage('Apply') { // Etapa anidada para aplicar Terraform
-                        steps {
-                            sh 'cd infra && terraform apply -input=false tfplan'
-                        }
-                    }
+                    sh '''
+                        cd infra
+                        rm -f .terraform.tfstate.lock.info
+                        rm -f .terraform.lock.hcl
+                        rm -rf .terraform/
+                        rm -f terraform.tfstate
+                        echo "Cleaned previous terraform state and locks"
+                    '''
+                    sh 'terraform init'
+                    sh "terraform plan -var-file=\"${TFVARS_FILE}\" -out tfplan"
+                    sh 'terraform show -no-color tfplan > tfplan.txt'
                 }
             }
-        } // Fin de la etapa 'AWS Terraform Operations'
+        }
+
+        stage('Approval') {
+            when {
+                expression { !params.autoApprove }
+            }
+            steps {
+                script {
+                    def plan = readFile 'infra/tfplan.txt'
+                    input message: "Approve the following Terraform plan?\n\n${plan}"
+                }
+            }
+        }
+
+        stage('Apply') {
+            steps {
+                withAWS(credentials: 'lowestpermissiontester-credentials', region: "${env.AWS_REGION}") {
+                    sh 'cd infra && terraform apply -input=false tfplan'
+                }
+            }
+        }
     }
 
     post {
         always {
-            // Limpiar archivos de plan y estado si existen
-            sh 'cd infra && rm -f tfplan tfplan.txt || true' // '|| true' para evitar fallos si los archivos no existen
+            sh 'cd infra && rm -f tfplan tfplan.txt || true'
             echo 'Deployment process finished.'
         }
         success {
