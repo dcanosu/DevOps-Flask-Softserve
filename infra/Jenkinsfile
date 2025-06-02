@@ -1,86 +1,149 @@
 pipeline {
-    agent any
-
+    parameters {
+        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
+    }
     environment {
-        TFVARS_FILE = credentials('terraform-vars')
+        // SSH keys are needed for Ansible to connect to the EC2 instance.
+        // These are not AWS API credentials, so they remain in the environment block.
+        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
+        SSH_PRIVATE_KEY_PATH    = credentials('ec2-ssh-key')
+        // AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY will be set by the 'withAWS' step
+        // for the stages that require them.
+    }
+    agent any // Specifies that the pipeline can run on any available agent
+
+    tools {
+        terraform 'terraform' // Assumes 'terraform' tool is configured in Jenkins
+        ansible 'ansible'     // Assumes 'ansible' tool is configured in Jenkins
     }
 
     stages {
-        stage('Declarative: Checkout SCM') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Verify Setup') {
             steps {
+                // Verify that Terraform and Ansible tools are available
                 sh 'terraform --version'
-                sh 'pwd'
-                sh 'ls -la'
-                sh 'ls -la infra'
-            }
-        }
-
-        stage('Verify TFVARS File') {
-            steps {
-                withCredentials([file(credentialsId: 'terraform-vars', variable: 'TFVARS_FILE')]) {
-                    sh '''
-                        echo '=== Contents of TFVARS_FILE ==='
-                        cat "$TFVARS_FILE"
-                    '''
-                }
+                sh 'ansible --version'
             }
         }
 
         stage('Plan') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'lowestpermissiontester-credentials']]) {
-                    withEnv(['AWS_DEFAULT_REGION=sa-east-1']) {
-                        dir('infra') {
-                            sh 'terraform init'
-                            sh "terraform plan -var-file=\"$TFVARS_FILE\" -out=tfplan"
-                            sh 'terraform show -no-color tfplan > tfplan.txt'
-                        }
+                // The 'withAWS' step injects the AWS credentials into the environment
+                // for the commands executed within its block.
+                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                    // 'withCredentials' is used to get the content of the terraform-tfvars file.
+                    withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
+                        // Clean up any hanging processes and reinitialize Terraform
+                        sh '''
+                            cd infra
+                            # Remove any existing lock files to prevent issues
+                            rm -f .terraform.tfstate.lock.info
+                            rm -f .terraform.lock.hcl
+                            rm -rf .terraform/
+                            # Also clean the state file if it's corrupted or for a fresh start
+                            rm -f terraform.tfstate
+                            echo "Cleaned previous terraform state and locks"
+                        '''
+
+                        // Initialize Terraform within the 'infra' directory
+                        sh 'cd infra && terraform init'
+
+                        // Generate the Terraform plan.
+                        // The SSH_PUBLIC_KEY is passed as a variable to Terraform.
+                        sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
+
+                        // Show the plan in a human-readable format and save to a file
+                        sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
                     }
                 }
             }
         }
 
-        stage('Apply') {
+        stage('Approval') {
+            // This stage is skipped if 'autoApprove' parameter is true
             when {
-                expression {
-                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
+                not {
+                    equals expected: true, actual: params.autoApprove
                 }
             }
             steps {
-                input 'Do you want to apply these changes?'
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'lowestpermissiontester-credentials']]) {
-                    withEnv(['AWS_DEFAULT_REGION=sa-east-1']) {
-                        dir('infra') {
-                            sh 'terraform apply -input=false tfplan'
-                        }
+                script {
+                    // Read the Terraform plan output for review
+                    def plan = readFile 'infra/tfplan.txt'
+                    // Prompt for manual approval, displaying the plan
+                    input message: "Do you want to apply the plan?",
+                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                }
+            }
+        }
+
+        stage('Apply') {
+            steps {
+                // The 'withAWS' step ensures AWS credentials are available for Terraform apply
+                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                    // Apply the Terraform plan
+                    sh 'cd infra && terraform apply -input=false tfplan'
+                }
+            }
+        }
+
+        stage('Get Terraform Outputs') {
+            steps {
+                // The 'withAWS' step ensures AWS credentials are available for Terraform output
+                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                    dir('infra') {
+                        // Get Terraform outputs in JSON format
+                        sh 'terraform output -json > outputs.json'
                     }
+
+                    script {
+                        // Read the JSON outputs
+                        def tf = readJSON file: 'infra/outputs.json'
+                        // Set environment variables from Terraform outputs
+                        env.EC2_IP       = tf.ec2_public_ip.value
+                        env.RDS_ENDPOINT = tf.rds_endpoint.value
+
+                        // Write Ansible inventory file
+                        writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
+                            ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+                            [flask_servers:vars]
+                            rds_endpoint=${env.RDS_ENDPOINT}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Ansible: Test Connectivity') {
+            steps {
+                // The 'withAWS' step is included here in case Ansible modules
+                // interact with AWS APIs (e.g., dynamic inventory, EC2 module).
+                // If Ansible only uses SSH, this might not be strictly necessary,
+                // but it's good practice for consistency.
+                withAWS(credentials: 'lowestpermissiontester-credentials', region: 'sa-east-1') {
+                    // Run an Ansible playbook to test connectivity to the EC2 instance
+                    sh 'ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml'
                 }
             }
         }
     }
 
     post {
+        // Actions to run after the main stages, regardless of success or failure
         always {
-            script {
-                def workspace = pwd()
-                try {
-                    dir("${workspace}/infra") {
-                        sh 'rm -f tfplan tfplan.txt || true'
-                    }
-                } catch (Exception e) {
-                    echo "Error cleaning up Terraform files: ${e}"
-                }
-            }
-            echo 'Deployment process finished.'
+            // Clean up Terraform plan and output files.
+            // 'cd infra' ensures the command runs in the correct directory.
+            // '|| echo "No temp files to clean"' prevents the step from failing if files don't exist.
+            sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
         }
+        // Actions to run only on successful pipeline completion
+        success {
+            echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
+        }
+        // Actions to run only on pipeline failure
         failure {
-            echo '💔 Deployment failed. Check logs above.'
+            echo "Deployment failed. Check logs above."
         }
     }
 }
