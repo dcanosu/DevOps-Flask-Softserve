@@ -4,7 +4,7 @@ pipeline {
     }
     environment {
         SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
-        SSH_PRIVATE_KEY_PATH    = credentials('ec2-ssh-key')
+        SSH_PRIVATE_KEY_PATH    = "/home/danie/.ssh/id_rsa" // Asegúrate de que "danie" sea tu usuario en WSL
     }
     agent any
 
@@ -17,9 +17,8 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                withEnv(["PATH+ANSIBLE=${tool 'ansible'}"]) {
-                    sh "${tool 'ansible'}/ansible --version"
-                }
+                sh 'which ansible'
+                sh 'ansible --version'
             }
         }
 
