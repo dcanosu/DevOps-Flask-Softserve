@@ -18,6 +18,7 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
+                sh 'bash -c "which ansible"'
                 sh 'bash -c "ansible --version"'
             }
         }
