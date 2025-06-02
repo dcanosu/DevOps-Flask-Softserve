@@ -17,7 +17,9 @@ pipeline {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
-                sh 'ansible --version'
+                withEnv(["PATH+ANSIBLE=${tool 'ansible'}/bin"]) {
+                    sh "${tool 'ansible'}/bin/ansible --version"
+                }
             }
         }
 
