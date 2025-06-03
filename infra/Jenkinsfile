@@ -52,9 +52,10 @@ pipeline {
                             // Restringimos los permisos del archivo en Windows (INTENTO - puede no ser efectivo)
                             sh "icacls \"${env.PRIVATE_KEY_FILE_WINDOWS}\" /grant:r \"${env.USERNAME}\":F /inheritance:r"
                             sh "icacls \"${env.PRIVATE_KEY_FILE_WINDOWS}\" /remove:d BUILTIN\\Users"
+                            // Obtenemos la ruta de Windows para WSL
+                            def windowsPrivateKeyPath = "${env.PRIVATE_KEY_FILE_WINDOWS}".replace('\\', '/')
                             // Obtenemos la clave pública usando WSL para acceder al archivo en el workspace de Windows
-                            def privateKeyFileWSL = "$(wsl wslpath -u \"${env.PRIVATE_KEY_FILE_WINDOWS}\")"
-                            env.SSH_PUBLIC_KEY = sh(script: "wsl ssh-keygen -y -f \"${privateKeyFileWSL}\"", returnStdout: true).trim()
+                            env.SSH_PUBLIC_KEY = sh(script: "wsl ssh-keygen -y -f \"${windowsPrivateKeyPath}\"", returnStdout: true).trim()
                             // Limpiamos el archivo (IMPORTANTE)
                             deleteDir(dir: env.PRIVATE_KEY_FILE_WINDOWS)
                         }
