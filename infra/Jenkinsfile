@@ -45,13 +45,13 @@ pipeline {
                         file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
                         file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_FILE')
                     ]) {
-                        // ¡CORRECCIÓN DE PERMISOS! Restringimos los permisos del archivo de clave privada
-                        sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
-                        sh "cd infra && terraform init"
-                        // Obtenemos la clave pública y la guardamos en la variable de entorno
                         script {
-                            env.SSH_PUBLIC_KEY = sh(script: "ssh-keygen -y -f \"${SSH_PRIVATE_KEY_FILE}\"", returnStdout: true).trim()
+                            // ¡MODIFICACIÓN DE PERMISOS! Ejecutamos chmod dentro de un bloque script
+                            def privateKeyFile = "${SSH_PRIVATE_KEY_FILE}"
+                            sh "chmod 400 \"${privateKeyFile}\""
+                            env.SSH_PUBLIC_KEY = sh(script: "ssh-keygen -y -f \"${privateKeyFile}\"", returnStdout: true).trim()
                         }
+                        sh "cd infra && terraform init"
                         sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=${env.SSH_PUBLIC_KEY}\" -out tfplan"
                     }
                 }
@@ -67,7 +67,6 @@ pipeline {
         stage('Apply') {
             steps {
                 withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
-                    // Ya no necesitamos pasar la clave pública aquí, se usará la variable de entorno
                     sh "cd infra && terraform apply -input=false tfplan"
                 }
             }
