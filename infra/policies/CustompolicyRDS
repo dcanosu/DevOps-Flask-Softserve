@@ -1,0 +1,37 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "rds:CreateDBInstance",
+                "rds:DeleteDBInstance",
+                "rds:ModifyDBInstance",
+                "rds:DescribeDBInstances",
+                "rds:CreateDBSecurityGroup",
+                "rds:DeleteDBSecurityGroup",
+                "rds:AuthorizeDBSecurityGroupIngress",
+                "rds:RevokeDBSecurityGroupIngress",
+                "rds:CreateDBSubnetGroup",
+                "rds:DeleteDBSubnetGroup",
+                "rds:DescribeDBSubnetGroups",
+                "rds:DescribeDBEngineVersions",
+                "rds:ListTagsForResource"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "rds:AddTagsToResource",
+                "rds:RemoveTagsFromResource"
+            ],
+            "Resource": "arn:aws:rds:*:*:db:*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestTag/Name": "flaskappdb"
+                }
+            }
+        }
+    ]
+}
