@@ -46,7 +46,7 @@ pipeline {
                         sh "cp \"${TFVARS_FILE}\" infra/terraform.tfvars"
                         sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
                         sh "cd infra && terraform init"
-                        sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=$(cat \"${SSH_PRIVATE_KEY_FILE}\")\" -out tfplan"
+                        sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=\\$(cat \\\"${SSH_PRIVATE_KEY_FILE}\\\")\" -out tfplan"
                     }
                 }
             }
