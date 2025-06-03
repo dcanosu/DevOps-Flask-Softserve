@@ -10,8 +10,8 @@ pipeline {
     }
 
     environment {
-        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
-        SSH_PRIVATE_KEY_PATH    = "C:\\Users\\danie\\.ssh\\id_rsa" // Ruta de Windows
+        SSH_PUBLIC_KEY         = credentials('ec2-ssh-key-public')
+        SSH_PRIVATE_KEY_PATH   = "C:\\Users\\danie\\.ssh\\id_rsa" // Ruta de Windows
     }
 
     stages {
@@ -24,19 +24,23 @@ pipeline {
 
         stage('Plan') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
-                    withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
-                        sh '''
-                            cd infra
-                            rm -f .terraform.tfstate.lock.info
-                            rm -f .terraform.lock.hcl
-                            rm -rf .terraform/
-                            rm -f terraform.tfstate
-                            echo "Cleaned previous terraform state and locks"
-                        '''
-                        sh 'cd infra && terraform init'
-                        sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
-                        sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
+                script {
+                    withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                        withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
+                            sh '''
+                                cd infra
+                                rm -f .terraform.tfstate.lock.info
+                                rm -f .terraform.lock.hcl
+                                rm -rf .terraform/
+                                rm -f terraform.tfstate
+                                echo "Cleaned previous terraform state and locks"
+                            '''
+                            // Añadimos este paso para imprimir el contenido del archivo TFVARS_FILE
+                            sh "cat $TFVARS_FILE"
+                            sh 'cd infra && terraform init'
+                            sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
+                            sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
+                        }
                     }
                 }
             }
@@ -52,7 +56,7 @@ pipeline {
                 script {
                     def plan = readFile 'infra/tfplan.txt'
                     input message: "Do you want to apply the plan?",
-                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                          parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
                 }
             }
         }
@@ -73,8 +77,8 @@ pipeline {
                     }
                     script {
                         def tf = readJSON file: 'infra/outputs.json'
-                        env.EC2_IP       = tf.ec2_public_ip.value
-                        env.RDS_ENDPOINT = tf.rds_endpoint.value
+                        env.EC2_IP         = tf.ec2_public_ip.value
+                        env.RDS_ENDPOINT   = tf.rds_endpoint.value
                         writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
                             ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
