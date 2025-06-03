@@ -44,7 +44,6 @@ variable "password" {
   description = "Password for the master DB user. Marked as sensitive for security."
   type      = string
   sensitive = true
-  default = "flaskflask"
 }
 
 # variable "parameter_group_name" {
