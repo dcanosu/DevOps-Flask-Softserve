@@ -7,6 +7,7 @@ pipeline {
         SSH_PRIVATE_KEY_ID = 'ec2-ssh-key'
         TFVARS_FILE_ID = 'terraform-tfvars'
         AWS_CREDENTIALS_ID = 'lowestpermissiontester'
+        SSH_PUBLIC_KEY = '' // Inicializamos la variable de entorno
     }
 
     tools {
@@ -46,8 +47,11 @@ pipeline {
                     ]) {
                         sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
                         sh "cd infra && terraform init"
-                        // ¡CORRECCIÓN CLAVE SSH! Usando ssh-keygen -y para obtener la clave pública
-                        sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=`ssh-keygen -y -f \\\"${SSH_PRIVATE_KEY_FILE}\\\"`\" -out tfplan"
+                        // Obtenemos la clave pública y la guardamos en la variable de entorno
+                        script {
+                            env.SSH_PUBLIC_KEY = sh(script: "ssh-keygen -y -f \"${SSH_PRIVATE_KEY_FILE}\"", returnStdout: true).trim()
+                        }
+                        sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=${env.SSH_PUBLIC_KEY}\" -out tfplan"
                     }
                 }
             }
@@ -62,6 +66,7 @@ pipeline {
         stage('Apply') {
             steps {
                 withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
+                    // Ya no necesitamos pasar la clave pública aquí, se usará la variable de entorno
                     sh "cd infra && terraform apply -input=false tfplan"
                 }
             }
