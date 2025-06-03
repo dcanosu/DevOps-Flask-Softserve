@@ -1,37 +1,20 @@
 pipeline {
+    parameters {
+        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
+    }
     agent any
 
-    environment {
-        AWS_REGION = 'sa-east-1'
-        GIT_CREDENTIALS_ID = 'github-credentials'
-        SSH_PRIVATE_KEY_ID = 'ec2-ssh-key'
-        TFVARS_FILE_ID = 'terraform-tfvars'
-        AWS_CREDENTIALS_ID = 'lowestpermissiontester'
-        SSH_PUBLIC_KEY = '' // Inicializamos la variable de entorno
-        PRIVATE_KEY_FILE_WINDOWS = "${WORKSPACE}/id_rsa_temp" // Archivo temporal en el workspace de Jenkins
+    tools {
+        terraform 'terraform' // Asegúrate de que la herramienta Terraform esté configurada en Jenkins
+        ansible 'ansible'     // Asegúrate de que la herramienta Ansible esté configurada en Jenkins (apuntando a la ubicación de Windows)
     }
 
-    tools {
-        terraform 'terraform'
-        ansible 'ansible'
+    environment {
+        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
+        SSH_PRIVATE_KEY_PATH    = "C:\\Users\\danie\\.ssh\\id_rsa" // Ruta de Windows
     }
 
     stages {
-        stage('Checkout SCM') {
-            steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: 'origin/lowestpermissionuser']],
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [],
-                    userRemoteConfigs: [[
-                        credentialsId: env.GIT_CREDENTIALS_ID,
-                        url: 'https://github.com/dcanosu/DevOps-Flask-Softserve.git'
-                    ]]
-                ])
-            }
-        }
-
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
@@ -41,56 +24,63 @@ pipeline {
 
         stage('Plan') {
             steps {
-                withAWS(credentials: env.AWS_CREDENTIALS_ID) {
-                    withCredentials([
-                        file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
-                        file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_CONTENT') // Leemos el contenido directamente
-                    ]) {
-                        script {
-                            // ¡ADVERTENCIA DE SEGURIDAD! Escribimos la clave privada al workspace de Jenkins
-                            writeFile file: env.PRIVATE_KEY_FILE_WINDOWS, text: env.SSH_PRIVATE_KEY_CONTENT
-                            // Restringimos los permisos del archivo en Windows (INTENTO - puede no ser efectivo)
-                            sh "icacls \"${env.PRIVATE_KEY_FILE_WINDOWS}\" /grant:r \"${env.USERNAME}\":F /inheritance:r"
-                            sh "icacls \"${env.PRIVATE_KEY_FILE_WINDOWS}\" /remove:d BUILTIN\\Users"
-                            // Obtenemos la ruta de Windows para WSL
-                            def windowsPrivateKeyPath = "${env.PRIVATE_KEY_FILE_WINDOWS}".replace('\\', '/')
-                            // Obtenemos la clave pública usando WSL para acceder al archivo en el workspace de Windows
-                            env.SSH_PUBLIC_KEY = sh(script: "wsl ssh-keygen -y -f \"${windowsPrivateKeyPath}\"", returnStdout: true).trim()
-                            // Limpiamos el archivo (IMPORTANTE)
-                            deleteDir(dir: env.PRIVATE_KEY_FILE_WINDOWS)
-                        }
-                        sh "cd infra && terraform init"
-                        sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=${env.SSH_PUBLIC_KEY}\" -out tfplan"
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                    withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
+                        sh '''
+                            cd infra
+                            rm -f .terraform.tfstate.lock.info
+                            rm -f .terraform.lock.hcl
+                            rm -rf .terraform/
+                            rm -f terraform.tfstate
+                            echo "Cleaned previous terraform state and locks"
+                        '''
+                        sh 'cd infra && terraform init'
+                        sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
+                        sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
                     }
                 }
             }
         }
 
         stage('Approval') {
+            when {
+                not {
+                    equals expected: true, actual: params.autoApprove
+                }
+            }
             steps {
-                input message: 'Approve Terraform plan?', ok: 'Proceed to Apply'
+                script {
+                    def plan = readFile 'infra/tfplan.txt'
+                    input message: "Do you want to apply the plan?",
+                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                }
             }
         }
 
         stage('Apply') {
             steps {
-                withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
-                    sh "cd infra && terraform apply -input=false tfplan"
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                    sh 'cd infra && terraform apply -input=false tfplan'
                 }
             }
         }
 
         stage('Get Terraform Outputs') {
             steps {
-                withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
-                    sh 'cd infra && terraform output'
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                    dir('infra') {
+                        sh 'terraform output -json > outputs.json'
+                    }
                     script {
-                        def ec2_ip = sh(script: 'cd infra && terraform output -raw ec2_public_ip', returnStdout: true).trim()
-                        def rds_endpoint = sh(script: 'cd infra && terraform output -raw rds_endpoint', returnStdout: true).trim()
-                        echo "EC2 Public IP: ${ec2_ip}"
-                        echo "RDS Endpoint: ${rds_endpoint}"
-                        env.EC2_PUBLIC_IP = ec2_ip
-                        env.RDS_ENDPOINT = rds_endpoint
+                        def tf = readJSON file: 'infra/outputs.json'
+                        env.EC2_IP       = tf.ec2_public_ip.value
+                        env.RDS_ENDPOINT = tf.rds_endpoint.value
+                        writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
+                            ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+                            [flask_servers:vars]
+                            rds_endpoint=${env.RDS_ENDPOINT}
+                        """
                     }
                 }
             }
@@ -98,31 +88,31 @@ pipeline {
 
         stage('Ansible: Test Connectivity') {
             steps {
-                withCredentials([file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'ANSIBLE_PRIVATE_KEY_FILE')]) {
-                    sh """
-                        chmod 400 "${ANSIBLE_PRIVATE_KEY_FILE}"
-                        wsl ansible -i "${env.EC2_PUBLIC_IP}," --private-key="${ANSIBLE_PRIVATE_KEY_FILE}" -m ping all
-                    """
+                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                    sh 'wsl ansible-playbook -i /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/inventory.ini /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/playbooks/test_connections.yml'
                 }
             }
         }
 
         stage('Cleanup') {
             steps {
-                echo 'Deployment process finished.'
+                always {
+                    sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+                    echo 'Cleanup process finished.'
+                }
             }
         }
     }
 
     post {
         always {
-            echo '💔 Deployment finished.'
+            echo 'Deployment process finished.'
         }
         success {
-            echo '💚 Deployment successful!'
+            echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
         }
         failure {
-            echo '💔 Deployment failed. Check logs above.'
+            echo "💔 Deployment failed. Check logs above."
         }
     }
 }
