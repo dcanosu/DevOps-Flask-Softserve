@@ -17,31 +17,33 @@ pipeline {
         stage('Checkout SCM') {
             steps {
                 checkout([
-                    <span class="math-inline">class\: 'GitSCM',
-branches\: \[\[name\: 'origin/lowestpermissionuser'\]\],
-doGenerateSubmoduleConfigurations\: false,
-extensions\: \[\],
-userRemoteConfigs\: \[\[
-credentialsId\: env\.GIT\_CREDENTIALS\_ID,
-url\: 'https\://github\.com/dcanosu/DevOps\-Flask\-Softserve\.git'
-\]\]
-\]\)
-\}
-\}
-stage\('Verify Setup'\) \{
-steps \{
-sh 'terraform \-\-version'
-sh 'wsl ansible \-\-version'
-\}
-\}
-stage\('Plan'\) \{
-steps \{
-withAWS\(credentials\: ''\) \{
-withCredentials\(\[
-file\(credentialsId\: env\.TFVARS\_FILE\_ID, variable\: 'TFVARS\_FILE'\),
-file\(credentialsId\: env\.SSH\_PRIVATE\_KEY\_ID, variable\: 'SSH\_PRIVATE\_KEY\_FILE'\)
-\]\) \{
-sh "cp \\"</span>{TFVARS_FILE}\" infra/terraform.tfvars"
+                    $class: 'GitSCM',
+                    branches: [[name: 'origin/lowestpermissionuser']],
+                    doGenerateSubmoduleConfigurations: false,
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        credentialsId: env.GIT_CREDENTIALS_ID,
+                        url: 'https://github.com/dcanosu/DevOps-Flask-Softserve.git'
+                    ]]
+                ])
+            }
+        }
+
+        stage('Verify Setup') {
+            steps {
+                sh 'terraform --version'
+                sh 'wsl ansible --version'
+            }
+        }
+
+        stage('Plan') {
+            steps {
+                withAWS(credentials: '') {
+                    withCredentials([
+                        file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
+                        file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_FILE')
+                    ]) {
+                        sh "cp \"${TFVARS_FILE}\" infra/terraform.tfvars"
                         sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
                         sh "cd infra && terraform init"
                         sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=`cat \\\"${SSH_PRIVATE_KEY_FILE}\\\"`\" -out tfplan"
@@ -72,18 +74,19 @@ sh "cp \\"</span>{TFVARS_FILE}\" infra/terraform.tfvars"
                         def ec2_ip = sh(script: 'cd infra && terraform output -raw ec2_public_ip', returnStdout: true).trim()
                         def rds_endpoint = sh(script: 'cd infra && terraform output -raw rds_endpoint', returnStdout: true).trim()
                         echo "EC2 Public IP: ${ec2_ip}"
-                        echo "RDS Endpoint: <span class="math-inline">\{rds\_endpoint\}"
-env\.EC2\_PUBLIC\_IP \= ec2\_ip
-env\.RDS\_ENDPOINT \= rds\_endpoint
-\}
-\}
-\}
-\}
-stage\('Ansible\: Test Connectivity'\) \{
-steps \{
-withCredentials\(\[string\(name\: 'SSH\_PRIVATE\_KEY\_ID', variable\: 'ANSIBLE\_PRIVATE\_KEY'\)\]\) \{
-sh """
-wsl ansible \-i "</span>{env.EC2_PUBLIC_IP}," --private-key="${ANSIBLE_PRIVATE_KEY}" -m ping all
+                        echo "RDS Endpoint: ${rds_endpoint}"
+                        env.EC2_PUBLIC_IP = ec2_ip
+                        env.RDS_ENDPOINT = rds_endpoint
+                    }
+                }
+            }
+        }
+
+        stage('Ansible: Test Connectivity') {
+            steps {
+                withCredentials([string(name: 'SSH_PRIVATE_KEY_ID', variable: 'ANSIBLE_PRIVATE_KEY')]) {
+                    sh """
+                        wsl ansible -i "${env.EC2_PUBLIC_IP}," --private-key="${ANSIBLE_PRIVATE_KEY}" -m ping all
                     """
                 }
             }
