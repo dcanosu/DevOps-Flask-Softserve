@@ -46,8 +46,8 @@ pipeline {
                         file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_CONTENT') // Leemos el contenido directamente
                     ]) {
                         script {
-                            // ¡NUEVA ESTRATEGIA! Pasamos el contenido de la clave privada a ssh-keygen
-                            env.SSH_PUBLIC_KEY = sh(script: "echo \"${SSH_PRIVATE_KEY_CONTENT}\" | wsl ssh-keygen -y -f -", returnStdout: true).trim()
+                            // ¡LIGERA MODIFICACIÓN! Intentamos pasar la entrada de forma más explícita
+                            env.SSH_PUBLIC_KEY = sh(script: "wsl bash -c 'echo \"${SSH_PRIVATE_KEY_CONTENT}\" | ssh-keygen -y -f -'", returnStdout: true).trim()
                         }
                         sh "cd infra && terraform init"
                         sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=${env.SSH_PUBLIC_KEY}\" -out tfplan"
