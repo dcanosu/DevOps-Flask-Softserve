@@ -18,7 +18,7 @@ pipeline {
         stage('Verify Workspace') {
             steps {
                 sh 'pwd' // Imprime el directorio de trabajo actual
-                sh 'find . -name terraform.tfvars' // Busca archivos llamados terraform.tfvars desde el directorio actual
+                sh 'ls -lR | grep terraform.tfvars' // Lista recursivamente y filtra por el nombre del archivo
             }
         }
 
