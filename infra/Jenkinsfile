@@ -6,6 +6,8 @@ pipeline {
         GIT_CREDENTIALS_ID = 'github-credentials'
         SSH_PRIVATE_KEY_ID = 'ec2-ssh-key'
         TFVARS_FILE_ID = 'terraform-tfvars'
+        // ¡NUEVA VARIABLE! Asegúrate de que este ID coincida con tus credenciales de AWS en Jenkins
+        AWS_CREDENTIALS_ID = 'aws-credentials-for-terraform' // <--- ¡IMPORTANTE: REEMPLAZA CON EL ID REAL DE TUS CREDENCIALES AWS EN JENKINS!
     }
 
     tools {
@@ -38,7 +40,8 @@ pipeline {
 
         stage('Plan') {
             steps {
-                withAWS(credentials: '') {
+                // ¡CORREGIDO! Usando el ID de las credenciales AWS
+                withAWS(credentials: env.AWS_CREDENTIALS_ID) {
                     withCredentials([
                         file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
                         file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_FILE')
@@ -59,7 +62,8 @@ pipeline {
 
         stage('Apply') {
             steps {
-                withAWS(region: env.AWS_REGION, credentials: '') {
+                // ¡CORREGIDO! Usando el ID de las credenciales AWS
+                withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
                     sh "cd infra && terraform apply -input=false tfplan"
                 }
             }
@@ -67,7 +71,8 @@ pipeline {
 
         stage('Get Terraform Outputs') {
             steps {
-                withAWS(region: env.AWS_REGION, credentials: '') {
+                // ¡CORREGIDO! Usando el ID de las credenciales AWS
+                withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
                     sh 'cd infra && terraform output'
                     script {
                         def ec2_ip = sh(script: 'cd infra && terraform output -raw ec2_public_ip', returnStdout: true).trim()
@@ -83,9 +88,11 @@ pipeline {
 
         stage('Ansible: Test Connectivity') {
             steps {
-                withCredentials([string(name: 'SSH_PRIVATE_KEY_ID', variable: 'ANSIBLE_PRIVATE_KEY')]) {
+                // ¡CORREGIDO! Usando 'file' para la credencial SSH
+                withCredentials([file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'ANSIBLE_PRIVATE_KEY_FILE')]) {
                     sh """
-                        wsl ansible -i "${env.EC2_PUBLIC_IP}," --private-key="${ANSIBLE_PRIVATE_KEY}" -m ping all
+                        chmod 400 "${ANSIBLE_PRIVATE_KEY_FILE}"
+                        wsl ansible -i "${env.EC2_PUBLIC_IP}," --private-key="${ANSIBLE_PRIVATE_KEY_FILE}" -m ping all
                     """
                 }
             }
