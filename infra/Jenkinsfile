@@ -46,8 +46,12 @@ pipeline {
                         file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_CONTENT') // Leemos el contenido directamente
                     ]) {
                         script {
-                            // ¡LIGERA MODIFICACIÓN! Intentamos pasar la entrada de forma más explícita
-                            env.SSH_PUBLIC_KEY = sh(script: "wsl bash -c 'echo \"${SSH_PRIVATE_KEY_CONTENT}\" | ssh-keygen -y -f -'", returnStdout: true).trim()
+                            // ¡NUEVA ESTRATEGIA! Escribimos la clave privada a un archivo dentro de WSL
+                            def privateKeyFileWSL = "/tmp/id_rsa_jenkins"
+                            sh "wsl bash -c 'echo \"${SSH_PRIVATE_KEY_CONTENT}\" > ${privateKeyFileWSL}'"
+                            sh "wsl bash -c 'chmod 400 ${privateKeyFileWSL}'" // Aseguramos permisos correctos dentro de WSL
+                            env.SSH_PUBLIC_KEY = sh(script: "wsl ssh-keygen -y -f ${privateKeyFileWSL}", returnStdout: true).trim()
+                            sh "wsl bash -c 'rm -f ${privateKeyFileWSL}'" // Limpiamos el archivo
                         }
                         sh "cd infra && terraform init"
                         sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=${env.SSH_PUBLIC_KEY}\" -out tfplan"
