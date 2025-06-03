@@ -6,8 +6,8 @@ pipeline {
         GIT_CREDENTIALS_ID = 'github-credentials'
         SSH_PRIVATE_KEY_ID = 'ec2-ssh-key'
         TFVARS_FILE_ID = 'terraform-tfvars'
-        // ¡NUEVA VARIABLE! Asegúrate de que este ID coincida con tus credenciales de AWS en Jenkins
-        AWS_CREDENTIALS_ID = 'aws-credentials-for-terraform' // <--- ¡IMPORTANTE: REEMPLAZA CON EL ID REAL DE TUS CREDENCIALES AWS EN JENKINS!
+        // ¡CORRECCIÓN! Usando el ID de las credenciales que ya configuramos
+        AWS_CREDENTIALS_ID = 'lowestpermissiontester' // <--- ¡USA ESTE ID!
     }
 
     tools {
