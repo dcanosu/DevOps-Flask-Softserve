@@ -45,6 +45,7 @@ pipeline {
                         file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
                         file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_FILE')
                     ]) {
+                        // ¡CORRECCIÓN DE PERMISOS! Restringimos los permisos del archivo de clave privada
                         sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
                         sh "cd infra && terraform init"
                         // Obtenemos la clave pública y la guardamos en la variable de entorno
