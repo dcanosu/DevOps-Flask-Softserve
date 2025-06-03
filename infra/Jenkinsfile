@@ -39,7 +39,10 @@ pipeline {
         stage('Plan') {
             steps {
                 withAWS(credentials: '') {
-                    withCredentials([file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE')]) {
+                    withCredentials([
+                        file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
+                        string(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY')
+                    ]) {
                         sh "cp \"${TFVARS_FILE}\" infra/terraform.tfvars"
                         sh "cd infra && terraform init"
                         sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=${SSH_PRIVATE_KEY}\" -out tfplan"
