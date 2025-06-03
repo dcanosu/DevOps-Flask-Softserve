@@ -1,0 +1,26 @@
+server {
+    listen 80;
+    server_name your_domain.com www.your_domain.com; # Replace with your domain or IP
+
+    location / {
+        proxy_pass http://127.0.0.1:8000; # Assumes Gunicorn runs on port 8000
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /static {
+        alias /Users/sebastian/dev/learning/devops-soft/DevOps-Flask-Softserve/app/static; # Adjust if your static files are elsewhere
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    # Optional: You might want to add error pages, SSL configuration, etc.
+    # Example for SSL (requires SSL certificate):
+    # listen 443 ssl;
+    # ssl_certificate /path/to/your/fullchain.pem;
+    # ssl_certificate_key /path/to/your/privkey.pem;
+    # include /etc/letsencrypt/options-ssl-nginx.conf; # Recommended SSL options
+    # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # Diffie-Hellman parameters
+}
