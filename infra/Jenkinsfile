@@ -46,7 +46,7 @@ pipeline {
                         file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_CONTENT') // Leemos el contenido directamente
                     ]) {
                         script {
-                            def privateKeyFileWSL = "/tmp/id_rsa_jenkins"
+                            def privateKeyFileWSL = "~/id_rsa_jenkins" // Usamos el directorio home de WSL
                             // Escribimos el contenido de la clave privada a un archivo en WSL
                             sh "wsl bash -c 'cat <<EOF > ${privateKeyFileWSL}\n${SSH_PRIVATE_KEY_CONTENT}\nEOF'"
                             // Establecemos permisos estrictos dentro de WSL
