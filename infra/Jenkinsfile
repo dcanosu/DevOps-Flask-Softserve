@@ -27,19 +27,18 @@ pipeline {
                 script {
                     withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
                         withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
-                            sh '''
+                            sh """
                                 cd infra
                                 rm -f .terraform.tfstate.lock.info
                                 rm -f .terraform.lock.hcl
                                 rm -rf .terraform/
                                 rm -f terraform.tfstate
                                 echo "Cleaned previous terraform state and locks"
-                            '''
-                            // Añadimos este paso para imprimir el contenido del archivo TFVARS_FILE
-                            sh "cat $TFVARS_FILE"
-                            sh 'cd infra && terraform init'
-                            sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
-                            sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
+                                cat "$TFVARS_FILE"
+                                terraform init
+                                terraform plan -var-file="$TFVARS_FILE" -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan
+                                terraform show -no-color tfplan > tfplan.txt
+                            """
                         }
                     }
                 }
