@@ -37,7 +37,7 @@ variable "instance_class" {
 variable "username" {
   description = "Username for the master DB user."
   type    = string
-  //default = "admin"//
+  default = "flask"
 }
 
 variable "password" {
