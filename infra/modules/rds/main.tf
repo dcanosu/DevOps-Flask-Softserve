@@ -5,7 +5,7 @@ resource "aws_db_instance" "db_app_flask" {
   engine               = var.engine
   engine_version       = var.engine_version
   instance_class       = var.instance_class
-  username             = var.username
+  username             = "flask"
   password             = var.password
   # parameter_group_name = var.parameter_group_name
   skip_final_snapshot  = true
