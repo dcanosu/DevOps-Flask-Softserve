@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Register{% endblock %}
 
 {% block main_classes %}flex flex-col justify-center items-center{% endblock %}
 
 {% block content %}
 {# <div class="flex items-center justify-center flex-grow py-8 sm:px-6 lg:px-8"> #}
     <div class="max-w-md w-full bg-white shadow-md p-6">
-    <h1 class="text-3xl font-bold mb-6 text-gray-800">Login</h1>
+    <h1 class="text-3xl font-bold mb-6 text-gray-800">Register</h1>
     <form method="POST" class="space-y-4">
         <div>
             <label for="username" class="block text-gray-700">Username:</label>
@@ -17,10 +17,10 @@
             <label for="password" class="block text-gray-700">Password:</label>
             <input type="password" name="password" id="password" required class="w-full mt-1 p-3 border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-150 ease-in-out">
         </div>
-        <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition duration-150 ease-in-out">Login</button>
+        <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-75 transition duration-150 ease-in-out">Register</button>
     </form>
     <p class="mt-4 text-center">
-        Don't have an account? <a href="{{ url_for('auth.register') }}" class="text-blue-500 hover:underline">Register here</a>
+        Already have an account? <a href="{{ url_for('auth.login') }}" class="text-blue-500 hover:underline">Login here</a>
     </p>
     </div>
 {# </div> #}
