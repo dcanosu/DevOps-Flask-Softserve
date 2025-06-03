@@ -6,8 +6,7 @@ pipeline {
         GIT_CREDENTIALS_ID = 'github-credentials'
         SSH_PRIVATE_KEY_ID = 'ec2-ssh-key'
         TFVARS_FILE_ID = 'terraform-tfvars'
-        // ¡CORRECCIÓN! Usando el ID de las credenciales que ya configuramos
-        AWS_CREDENTIALS_ID = 'lowestpermissiontester' // <--- ¡USA ESTE ID!
+        AWS_CREDENTIALS_ID = 'lowestpermissiontester'
     }
 
     tools {
@@ -40,7 +39,6 @@ pipeline {
 
         stage('Plan') {
             steps {
-                // ¡CORREGIDO! Usando el ID de las credenciales AWS
                 withAWS(credentials: env.AWS_CREDENTIALS_ID) {
                     withCredentials([
                         file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
@@ -48,7 +46,8 @@ pipeline {
                     ]) {
                         sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
                         sh "cd infra && terraform init"
-                        sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=`cat \\\"${SSH_PRIVATE_KEY_FILE}\\\"`\" -out tfplan"
+                        // ¡CORRECCIÓN CLAVE SSH! Usando ssh-keygen -y para obtener la clave pública
+                        sh "cd infra && terraform plan -var-file=\"${TFVARS_FILE}\" -var=\"ssh_public_key=`ssh-keygen -y -f \\\"${SSH_PRIVATE_KEY_FILE}\\\"`\" -out tfplan"
                     }
                 }
             }
@@ -62,7 +61,6 @@ pipeline {
 
         stage('Apply') {
             steps {
-                // ¡CORREGIDO! Usando el ID de las credenciales AWS
                 withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
                     sh "cd infra && terraform apply -input=false tfplan"
                 }
@@ -71,7 +69,6 @@ pipeline {
 
         stage('Get Terraform Outputs') {
             steps {
-                // ¡CORREGIDO! Usando el ID de las credenciales AWS
                 withAWS(region: env.AWS_REGION, credentials: env.AWS_CREDENTIALS_ID) {
                     sh 'cd infra && terraform output'
                     script {
@@ -88,7 +85,6 @@ pipeline {
 
         stage('Ansible: Test Connectivity') {
             steps {
-                // ¡CORREGIDO! Usando 'file' para la credencial SSH
                 withCredentials([file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'ANSIBLE_PRIVATE_KEY_FILE')]) {
                     sh """
                         chmod 400 "${ANSIBLE_PRIVATE_KEY_FILE}"
