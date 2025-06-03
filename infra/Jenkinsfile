@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION = 'sa-east-1'
         GIT_CREDENTIALS_ID = 'github-credentials'
-        SSH_PRIVATE_KEY_ID = 'ec2-ssh-key' // ¡CORREGIDO!
+        SSH_PRIVATE_KEY_ID = 'ec2-ssh-key'
         TFVARS_FILE_ID = 'terraform-tfvars'
     }
 
@@ -41,11 +41,12 @@ pipeline {
                 withAWS(credentials: '') {
                     withCredentials([
                         file(credentialsId: env.TFVARS_FILE_ID, variable: 'TFVARS_FILE'),
-                        string(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY')
+                        file(credentialsId: env.SSH_PRIVATE_KEY_ID, variable: 'SSH_PRIVATE_KEY_FILE')
                     ]) {
                         sh "cp \"${TFVARS_FILE}\" infra/terraform.tfvars"
+                        sh "chmod 400 \"${SSH_PRIVATE_KEY_FILE}\""
                         sh "cd infra && terraform init"
-                        sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=${SSH_PRIVATE_KEY}\" -out tfplan"
+                        sh "cd infra && terraform plan -var-file=infra/terraform.tfvars -var=\"ssh_public_key=$(cat \"${SSH_PRIVATE_KEY_FILE}\")\" -out tfplan"
                     }
                 }
             }
