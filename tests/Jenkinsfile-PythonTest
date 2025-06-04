@@ -1,0 +1,107 @@
+pipeline {
+    agent any
+
+    tools {
+        // Assuming you have a Python tool configured in Jenkins, e.g., 'python3.9'
+        // If not, you might need to install Python directly or configure it in Jenkins Global Tool Configuration.
+        python 'python3.9' // Replace 'python3.9' with the name of your Python tool in Jenkins
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                script {
+                    // Checkout the latest code from your SCM
+                    checkout scm
+                    echo "Repository checked out."
+                }
+            }
+        }
+
+        stage('Setup Python Environment') {
+            steps {
+                script {
+                    // Change directory to your Python application's root
+                    dir('app') { // Adjust 'app' if your Python code is in a different subdirectory or at the root
+                        echo "Setting up Python virtual environment..."
+                        // Create a virtual environment
+                        sh 'python -m venv venv'
+                        // Activate the virtual environment and install pip and pytest
+                        sh '''
+                            source venv/bin/activate
+                            pip install --upgrade pip
+                            pip install pytest
+                        '''
+                        // Install dependencies from requirements.txt
+                        sh '''
+                            source venv/bin/activate
+                            if [ -f requirements.txt ]; then
+                                pip install -r requirements.txt
+                                echo "Dependencies installed from requirements.txt"
+                            else
+                                echo "No requirements.txt found. Skipping dependency installation."
+                            fi
+                        '''
+                        echo "Python environment setup complete."
+                    }
+                }
+            }
+        }
+
+        stage('Run Python Tests') {
+            steps {
+                script {
+                    // Change directory to your Python application's root
+                    dir('app') { // Adjust 'app' if your Python code is in a different subdirectory or at the root
+                        echo "Running Python tests with pytest..."
+                        // Activate the virtual environment and run tests
+                        sh '''
+                            source venv/bin/activate
+                            pytest --verbose
+                        '''
+                        echo "Python tests completed."
+                    }
+                }
+            }
+        }
+
+        // Optional: Add a stage for linting/code quality checks
+        // stage('Code Quality Check') {
+        //     steps {
+        //         script {
+        //             dir('app') {
+        //                 echo "Running Flake8 for code quality..."
+        //                 sh '''
+        //                     source venv/bin/activate
+        //                     pip install flake8
+        //                     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        //                     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        //                 '''
+        //                 echo "Code quality check completed."
+        //             }
+        //         }
+        //     }
+        // }
+    }
+
+    post {
+        always {
+            script {
+                // Clean up the virtual environment
+                dir('app') { // Adjust 'app' if your Python code is in a different subdirectory or at the root
+                    echo "Cleaning up Python virtual environment..."
+                    sh 'rm -rf venv'
+                    echo "Virtual environment removed."
+                }
+            }
+            echo 'Python testing pipeline finished.'
+        }
+        success {
+            echo '✅ Python application tests passed successfully!'
+        }
+        failure {
+            echo '❌ Python application tests failed. Check logs above.'
+        }
+    }
+}
+
