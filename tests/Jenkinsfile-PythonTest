@@ -1,10 +1,13 @@
 pipeline {
     agent any
 
+    // Removed the 'python' tool declaration from here,
+    // as it's causing the "Invalid tool type" error.
+    // The pipeline will now rely on 'python' being available in the agent's PATH,
+    // and the virtual environment will manage specific versions.
     tools {
-        // Assuming you have a Python tool configured in Jenkins, e.g., 'python3.9'
-        // If not, you might need to install Python directly or configure it in Jenkins Global Tool Configuration.
-        python 'python3.9' // Replace 'python3.9' with the name of your Python tool in Jenkins
+        // If you had other tools like 'git' or 'jdk' that are recognized by Jenkins,
+        // they would remain here.
     }
 
     stages {
