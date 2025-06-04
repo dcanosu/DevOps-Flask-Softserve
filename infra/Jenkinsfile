@@ -5,20 +5,21 @@ pipeline {
     agent any
 
     tools {
-        terraform 'terraform' // Asegúrate de que la herramienta Terraform esté configurada en Jenkins
-        ansible 'ansible'     // Asegúrate de que la herramienta Ansible esté configurada en Jenkins (apuntando a la ubicación de Windows)
+        terraform 'terraform'
+        ansible 'ansible'
     }
 
     environment {
         SSH_PUBLIC_KEY         = credentials('ec2-ssh-key-public')
-        SSH_PRIVATE_KEY_PATH   = "C:\\Users\\danie\\.ssh\\id_rsa" // Ruta de Windows
+        // SSH_PRIVATE_KEY_PATH will be converted to WSL path dynamically
+        WINDOWS_SSH_PRIVATE_KEY_PATH = "C:\\Users\\danie\\.ssh\\id_rsa" // Original Windows path
     }
 
     stages {
         stage('Verify Workspace') {
             steps {
-                sh 'pwd' // Imprime el directorio de trabajo actual
-                sh 'ls -lR | grep terraform.tfvars' // Lista recursivamente y filtra por el nombre del archivo
+                sh 'pwd'
+                sh 'ls -lR | grep terraform.tfvars'
             }
         }
 
@@ -63,7 +64,7 @@ pipeline {
                 script {
                     def plan = readFile 'infra/tfplan.txt'
                     input message: "Do you want to apply the plan?",
-                          parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                            parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
                 }
             }
         }
@@ -78,29 +79,44 @@ pipeline {
 
         stage('Get Terraform Outputs') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
-                    dir('infra') {
-                        sh 'terraform output -json > outputs.json'
-                    }
-                    script {
+                script {
+                    // Convert Windows WORKSPACE to WSL path
+                    def wslWorkspace = env.WORKSPACE.replace('C:\\', '/mnt/c/').replace('\\', '/')
+                    // Convert Windows SSH_PRIVATE_KEY_PATH to WSL path for inventory.ini
+                    def wslSshPrivateKeyPath = env.WINDOWS_SSH_PRIVATE_KEY_PATH.replace('C:\\', '/mnt/c/').replace('\\', '/')
+
+                    withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                        dir('infra') {
+                            sh 'terraform output -json > outputs.json'
+                        }
                         def tf = readJSON file: 'infra/outputs.json'
-                        env.EC2_IP         = tf.ec2_public_ip.value
-                        env.RDS_ENDPOINT   = tf.rds_endpoint.value
+                        env.EC2_IP       = tf.ec2_public_ip.value
+                        env.RDS_ENDPOINT = tf.rds_endpoint.value
+
+                        // Write inventory.ini with the WSL path for the SSH key
                         writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
-                            ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+                            ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${wslSshPrivateKeyPath} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
                             [flask_servers:vars]
                             rds_endpoint=${env.RDS_ENDPOINT}
                         """
                     }
+                    // Store the WSL workspace path as an environment variable for later use
+                    env.WSL_WORKSPACE = wslWorkspace
                 }
             }
         }
 
         stage('Ansible: Test Connectivity') {
             steps {
-                withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
-                    sh 'wsl ansible-playbook -i /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/inventory.ini /mnt/c/Users/danie/proyecto_flask_04/DevOps-Flask-Softserve/infra/ansible/playbooks/test_connections.yml'
+                script {
+                    // Use the converted WSL_WORKSPACE path to construct Ansible paths
+                    def wslInventoryPath = "${env.WSL_WORKSPACE}/infra/ansible/inventory.ini"
+                    def wslPlaybookPath = "${env.WSL_WORKSPACE}/infra/ansible/playbooks/test_connections.yml"
+
+                    withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
+                        sh "wsl ansible-playbook -i ${wslInventoryPath} ${wslPlaybookPath}"
+                    }
                 }
             }
         }
