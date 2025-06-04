@@ -51,3 +51,8 @@ variable "password" {
 #   type    = string
 #   default = "default.postgres15"
 # }
+
+variable "ec2_security_group_id" {
+  description = "The security group ID of the EC2 instance that needs access to the RDS instance."
+  type        = string
+}
