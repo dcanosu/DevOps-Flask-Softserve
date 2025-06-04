@@ -1,14 +1,9 @@
 pipeline {
     agent any
 
-    // Removed the 'python' tool declaration from here,
-    // as it's causing the "Invalid tool type" error.
+    // Removed the entire 'tools' block.
     // The pipeline will now rely on 'python' being available in the agent's PATH,
-    // and the virtual environment will manage specific versions.
-    tools {
-        // If you had other tools like 'git' or 'jdk' that are recognized by Jenkins,
-        // they would remain here.
-    }
+    // and the virtual environment will manage specific versions for the tests.
 
     stages {
         stage('Checkout SCM') {
