@@ -38,15 +38,20 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                         """
 
                         echo "Installing dependencies from requirements.txt (located at root)..."
-                        // Check for requirements.txt at the root and install if it exists.
-                        sh """
-                            if [ -f requirements.txt ]; then
-                                "${venvPythonExecutable}" -m pip install -r requirements.txt
-                                echo "Dependencies installed from requirements.txt"
-                            else
-                                error "ERROR: requirements.txt not found at the repository root! Cannot install dependencies."
-                            fi
-                        """
+                        // Set PG_LIB_DIR explicitly for psycopg2-binary installation.
+                        // Replace 'C:/PROGRA~1/POSTGR~1/16/lib' with the actual path to your PostgreSQL 'lib' directory.
+                        // You can find this by looking at your PostgreSQL installation path (e.g., C:\Program Files\PostgreSQL\16\lib).
+                        // Using 'withEnv' for robustness.
+                        withEnv(["PG_LIB_DIR=C:/PROGRA~1/POSTGR~1/16/lib"]) { // IMPORTANT: Verify this path matches your PostgreSQL installation
+                            sh """
+                                if [ -f requirements.txt ]; then
+                                    "${venvPythonExecutable}" -m pip install -r requirements.txt
+                                    echo "Dependencies installed from requirements.txt"
+                                else
+                                    error "ERROR: requirements.txt not found at the repository root! Cannot install dependencies."
+                                fi
+                            """
+                        }
                         echo "Python environment setup complete."
                     }
                 }
@@ -58,9 +63,6 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                 script {
                     // Set PYTHONPATH for the entire stage using withEnv.
                     // This ensures the PARENT directory of 'app' is on the Python module search path.
-                    // If 'app' is directly under the workspace root, then the workspace root needs to be on PYTHONPATH.
-                    // If 'app' contains the main app.py, then 'app' itself needs to be importable as 'app'.
-                    // So, we set PYTHONPATH to include the workspace root.
                     withEnv(["PYTHONPATH=${env.WORKSPACE}"]) {
                         dir('.') { // Current working directory is the workspace root
                             echo "Verifying test files exist in 'Tests/' directory..."
@@ -70,8 +72,6 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                             // Path to the Python executable in the venv, now relative to the root.
                             def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
 
-                            // Run pytest. The `-p no:warnings` helps reduce noise from pytest about certain warnings.
-                            // We explicitly pass the 'Tests/' directory.
                             sh """
                                 "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=.venv_test/ -p no:warnings
                             """
