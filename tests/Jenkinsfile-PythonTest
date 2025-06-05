@@ -89,6 +89,11 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                                 "${venvPythonExecutableAtRoot}" -c "import sys; print('Python sys.path:', sys.path); import app; print('Successfully imported app')"
                             """
 
+                            echo "Attempting to run 'tests_models.py' directly as a diagnostic..." // NEW DIAGNOSTIC: Run test file directly
+                            sh """
+                                "${venvPythonExecutableAtRoot}" Tests/tests_models.py
+                            """
+
                             echo "Attempting to collect Python tests with pytest (--collect-only)..."
                             // Use --collect-only to diagnose collection issues separately from execution.
                             // Add -s to prevent output capture, and -vv for very verbose output during collection.
