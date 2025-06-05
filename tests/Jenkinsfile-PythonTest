@@ -1,4 +1,4 @@
-pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
+pipeline {
     agent any
 
     // No 'tools' block is used here.
@@ -81,6 +81,9 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                             // List contents of the 'Tests' directory to confirm file presence and casing
                             sh 'ls -lR Tests/'
 
+                            echo "Verifying tests_models.py content on agent..." // NEW DIAGNOSTIC: Print file content
+                            sh 'cat Tests/tests_models.py'
+
                             echo "Current PYTHONPATH: ${env.PYTHONPATH}" // DIAGNOSTIC: Print PYTHONPATH
 
                             echo "Attempting to import 'app' module as a diagnostic..." // DIAGNOSTIC: Attempt import
@@ -94,18 +97,11 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                                 "${venvPythonExecutableAtRoot}" Tests/tests_models.py
                             """
 
-                            echo "Attempting to collect Python tests with pytest (--collect-only)..."
-                            // Use --collect-only to diagnose collection issues separately from execution.
-                            // Add -s to prevent output capture, and -vv for very verbose output during collection.
-                            // Any import errors or test setup issues during collection should show up here.
+                            // Removed --collect-only to ensure we see execution errors if collection works.
+                            // Added --capture=no and --full-trace for more detailed output.
+                            echo "Running Python tests with pytest with maximum verbosity..."
                             sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=.venv_test/ -p no:warnings
-                            """
-
-                            echo "Running Python tests with pytest..."
-                            // This step will run the actual tests. It might fail if collection still yields 0 items.
-                            sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=.venv_test/ -p no:warnings
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=.venv_test/ -p no:warnings --capture=no --full-trace
                             """
                             echo "Python tests completed."
                         }
