@@ -60,9 +60,10 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
             steps {
                 script {
                     // Set PYTHONPATH for the entire stage using withEnv.
-                    // This ensures 'app' is on the Python module search path.
-                    // Ensure your 'app' directory contains an empty '__init__.py' file!
-                    withEnv(["PYTHONPATH=${env.WORKSPACE}/app"]) {
+                    // IMPORTANT: PYTHONPATH should point to the directory *containing* the 'app' package,
+                    // which is the workspace root itself (env.WORKSPACE).
+                    // This allows 'from app import create_app' to resolve correctly.
+                    withEnv(["PYTHONPATH=${env.WORKSPACE}"]) { // CORRECTED: Changed from '${env.WORKSPACE}/app' to '${env.WORKSPACE}'
                         dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
                             echo "Verifying test files exist in 'Tests/' directory..."
                             // List contents of the 'Tests' directory to confirm file presence and casing
@@ -95,7 +96,7 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         // stage('Code Quality Check') {
         //     steps {
         //         script {
-        //             withEnv(["PYTHONPATH=${env.WORKSPACE}/app"]) { // Also set PYTHONPATH for linting if needed
+        //             withEnv(["PYTHONPATH=${env.WORKSPACE}"]) { // Also set PYTHONPATH for linting if needed
         //                 dir('.') { // Or dir('app') if flake8 should scan only the app directory
         //                     echo "Running Flake8 for code quality..."
         //                     def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
