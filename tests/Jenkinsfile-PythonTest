@@ -1,9 +1,7 @@
+```groovy
 pipeline { 
     agent any
 
-    // No 'tools' block is used here.
-    // The pipeline relies on a 'python' executable being available in the agent's PATH,
-    // and then creates and uses a dedicated virtual environment for the build.
 
     stages {
         stage('Checkout SCM') {
@@ -70,16 +68,19 @@ pipeline {
                         echo "Attempting to collect Python tests with pytest (--collect-only)..."
                         def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
 
-                        // Use --collect-only to diagnose collection issues separately from execution.
-                        // Add -s to prevent output capture, and -vv for very verbose output during collection.
-                        // Any import errors or test setup issues during collection should show up here.
+                        // Set PYTHONPATH to include the 'app' directory, allowing 'from app import ...' to work.
+                        // The '.' means the current directory (workspace root) is also on the path.
+                        // Using '$PYTHONPATH:' ensures we append to any existing path, if applicable.
                         sh """
+                            export PYTHONPATH=\$PYTHONPATH:./app
                             "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=app/venv/
                         """
 
                         echo "Running Python tests with pytest..."
                         // This step will run the actual tests. It might fail if collection still yields 0 items.
+                        // Ensure PYTHONPATH is also set for the actual test run.
                         sh """
+                            export PYTHONPATH=\$PYTHONPATH:./app
                             "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=app/venv/
                         """
                         echo "Python tests completed."
@@ -98,6 +99,7 @@ pipeline {
         //                 echo "Running Flake8 for code quality..."
         //                 def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
         //                 sh """
+        //                     export PYTHONPATH=\$PYTHONPATH:./app
         //                     "${venvPythonExecutableAtRoot}" -m pip install flake8
         //                     "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         //                     "${venvPythonExecutableAtRoot}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
@@ -109,6 +111,7 @@ pipeline {
         //             //     echo "Running Flake8 for code quality..."
         //             //     def venvPythonExecutable = "./venv/Scripts/python"
         //             //     sh """
+        //             //         export PYTHONPATH=\$PYTHONPATH:./app
         //             //         "${venvPythonExecutable}" -m pip install flake8
         //             //         "${venvPythonExecutable}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         //             //         "${venvPythonExecutable}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
