@@ -29,4 +29,5 @@ module "rds_db_app_flask" {
   db_name = var.db_name
   username = var.username
   password = var.password
+  ec2_security_group_id = module.ec2_app_flask.security_group_id
 }

@@ -12,3 +12,8 @@ output "public_ip" {
   description = "Public ip of app_flask"
   value       = aws_instance.app_flask.public_ip
 }
+
+output "security_group_id" {
+  description = "ID of the EC2 instance security group"
+  value       = aws_security_group.app_sg.id
+}
