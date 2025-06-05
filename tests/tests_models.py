@@ -1,12 +1,9 @@
 import unittest
-
-from app import create_app
-import unittest
 from app import create_app, db
 from app.models import Note # Assuming Note is in app.models
 
-class Notetests(unittest.TestCase): # Still inherits from unittest.TestCase
-    def setUp(self): # CHANGED: Capital 'U'
+class TestNotes(unittest.TestCase): # CHANGED: Class name now starts with 'Test'
+    def setUp(self):
         self.app = create_app('ConfigTestConfig') # Assuming 'ConfigTestConfig' is valid
         self.client = self.app.test_client()
 
