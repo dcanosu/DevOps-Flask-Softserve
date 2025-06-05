@@ -97,12 +97,11 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                                 "${venvPythonExecutableAtRoot}" Tests/tests_models.py
                             """
 
-                            echo "Attempting to collect and run Python tests with pytest (enhanced discovery)..."
-                            // Added --pyargs Tests for explicit package discovery.
-                            // Added --collect-report collect.json to get a detailed report of collection.
-                            // Kept --capture=no and --full-trace for maximum output.
+                            echo "Attempting to collect and run Python tests with pytest..."
+                            // Simplified pytest command to avoid unrecognized arguments.
+                            // `--pyargs Tests` tells pytest to discover tests within the 'Tests' package.
                             sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=.venv_test/ --pyargs Tests --collect-report collect.json -p no:warnings --capture=no --full-trace
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose --ignore=.venv_test/ -p no:warnings --capture=no --full-trace Tests/
                             """
                             echo "Python tests completed."
                         }
