@@ -1,9 +1,8 @@
 pipeline {
     agent any
 
-    // Removed the entire 'tools' block.
-    // The pipeline will now rely on 'python' being available in the agent's PATH,
-    // and the virtual environment will manage specific versions for the tests.
+    // No 'tools' block needed here as we're managing the Python environment
+    // directly within the pipeline using 'venv' and direct python executable calls.
 
     stages {
         stage('Checkout SCM') {
@@ -22,19 +21,22 @@ pipeline {
                     // Change directory to your Python application's root
                     dir('app') { // Adjust 'app' if your Python code is in a different subdirectory or at the root
                         echo "Setting up Python virtual environment..."
-                        // Create a virtual environment
+                        // Create a virtual environment. On Windows, this creates 'venv\Scripts'.
                         sh 'python -m venv venv'
-                        // Activate the virtual environment and install pip and pytest
+
+                        // Define the path to the Python executable within the newly created virtual environment.
+                        // We use forward slashes as the 'sh' step (likely Git Bash) can interpret them.
+                        // On Windows, the Python executable is in 'venv\Scripts', not 'venv\bin'.
                         sh '''
-                            source venv/bin/activate
-                            pip install --upgrade pip
-                            pip install pytest
-                        '''
-                        // Install dependencies from requirements.txt
-                        sh '''
-                            source venv/bin/activate
+                            VENV_PYTHON="./venv/Scripts/python"
+
+                            echo "Installing basic Python packages (pip, pytest) into the virtual environment..."
+                            "$VENV_PYTHON" -m pip install --upgrade pip
+                            "$VENV_PYTHON" -m pip install pytest
+
+                            echo "Installing dependencies from requirements.txt if present..."
                             if [ -f requirements.txt ]; then
-                                pip install -r requirements.txt
+                                "$VENV_PYTHON" -m pip install -r requirements.txt
                                 echo "Dependencies installed from requirements.txt"
                             else
                                 echo "No requirements.txt found. Skipping dependency installation."
@@ -52,10 +54,10 @@ pipeline {
                     // Change directory to your Python application's root
                     dir('app') { // Adjust 'app' if your Python code is in a different subdirectory or at the root
                         echo "Running Python tests with pytest..."
-                        // Activate the virtual environment and run tests
+                        // Use the Python executable from the virtual environment to run pytest
                         sh '''
-                            source venv/bin/activate
-                            pytest --verbose
+                            VENV_PYTHON="./venv/Scripts/python"
+                            "$VENV_PYTHON" -m pytest --verbose
                         '''
                         echo "Python tests completed."
                     }
@@ -70,10 +72,10 @@ pipeline {
         //             dir('app') {
         //                 echo "Running Flake8 for code quality..."
         //                 sh '''
-        //                     source venv/bin/activate
-        //                     pip install flake8
-        //                     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        //                     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        //                     VENV_PYTHON="./venv/Scripts/python"
+        //                     "$VENV_PYTHON" -m pip install flake8
+        //                     "$VENV_PYTHON" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        //                     "$VENV_PYTHON" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
         //                 '''
         //                 echo "Code quality check completed."
         //             }
