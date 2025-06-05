@@ -1,7 +1,7 @@
 import os
 
 class Config:
-    # Database - usando variables de entorno
+    
     DB_USER = os.environ.get('DB_USER', 'flask_user')
     DB_PASSWORD = os.environ.get('DB_PASSWORD', 'flask_password')
     DB_HOST = os.environ.get('DB_HOST', 'localhost')
@@ -12,12 +12,12 @@ class Config:
         f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # ADD THIS BLOCK: Increase connection timeout
+    
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "connect_args": {"connect_timeout": 60} # Set connection timeout to 60 seconds (default is usually 10)
+        "connect_args": {"connect_timeout": 60} 
     }
 
-    # Security
+    
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-production'
 
 class TestConfig(Config):
