@@ -8,12 +8,12 @@
 
     - name: Check TCP connectivity from EC2 to RDS (port 5432)
       wait_for:
-        host: "{{ rds_endpoint }}"
-        port: 5432
+        host: "{{ rds_endpoint.split(':')[0] }}"
+        port: "{{ rds_endpoint.split(':')[1] }}"
         timeout: 10
       register: rds_check
 
     - name: Fail if RDS port check did not succeed
       fail:
-        msg: "Cannot reach RDS at {{ rds_endpoint }}:5432"
+        msg: "Cannot reach RDS at {{ rds_endpoint }}"
       when: not rds_check.elapsed < 10
