@@ -7,7 +7,7 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
         SSH_PUBLIC_KEY        = credentials('EC2_SSH_KEY_PUBLIC')
-        SSH_PRIVATE_KEY  = credentials('EC2_SSH_KEY_PRIVATE')
+        SSH_PRIVATE_KEY       = credentials('EC2_SSH_KEY_PRIVATE')
         TF_IN_AUTOMATION      = "true"
     }
     agent any
@@ -87,15 +87,12 @@ pipeline {
                         echo "Warning: EC2_IP not found in Terraform outputs. Ansible inventory might be incomplete."
                     }
 
-                    def inventoryContent = """[flask_servers]
-											${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${env.SSH_PRIVATE_KEY} ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+                    writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
+											${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
 											[flask_servers:vars]
 											rds_endpoint=${env.RDS_ENDPOINT}
 										"""
-
-                    writeFile file: 'infra/ansible/inventory.ini', text: inventoryContent
-                    echo "Ansible inventory generated. EC2_IP: ${env.EC2_IP}"
                 }
             }
         }
