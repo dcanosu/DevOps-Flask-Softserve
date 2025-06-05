@@ -1,36 +1,40 @@
 import unittest
 from app import create_app
-from app.models import db, Article # CHANGED: Import Article instead of Note
+from app.models import db, Article, User # Import User model too, as we'll create one
 
 class TestNotes(unittest.TestCase):
     def setUp(self):
-        self.app = create_app('ConfigTestConfig')
+        # CORRECTED: Pass the fully qualified import path to the TestConfig class
+        self.app = create_app('app.config.TestConfig')
         self.client = self.app.test_client()
 
         with self.app.app_context():
-            db.create_all()
+            db.create_all() # Recreates tables for each test
+            
+            # Ensure a user exists for the Article.user_id foreign key constraint
+            # Check if user already exists to prevent errors on repeated runs
+            user = User.query.filter_by(username="testuser").first()
+            if not user:
+                user = User(username="testuser", password_hash="testpasswordhash") # In a real app, hash this password
+                db.session.add(user)
+                db.session.commit()
+            
+            self.test_user_id = user.id # Store the user's ID for use in the test
 
     def tearDown(self):
         with self.app.app_context():
-            db.session.remove()
-            db.drop_all()
+            db.session.remove() # Close the session
+            db.drop_all()      # Drop all tables
 
-    def test_create_article(self): # Optional: Rename test method to reflect Article
+    def test_create_article(self):
         with self.app.app_context():
-            # Use Article model now
-            article = Article(title="Test Article Title", content="This is the content of the test article", user_id=1) # Note: user_id is required for Article
+            # Use the ID of the user created in setUp
+            article = Article(title="Test Article Title", content="This is the content of the test article", user_id=self.test_user_id)
             db.session.add(article)
             db.session.commit()
 
-            # Query for the Article
             retrieved_article = Article.query.first()
+            self.assertIsNotNone(retrieved_article) # Ensure an article was retrieved
             self.assertEqual(retrieved_article.title, "Test Article Title")
             self.assertEqual(retrieved_article.content, "This is the content of the test article")
-            self.assertEqual(retrieved_article.user_id, 1)
-
-            # You might want to add a test for user creation as well since Article requires a user_id
-            # Example:
-            # user = User(username="testuser", password_hash="hashedpassword")
-            # db.session.add(user)
-            # db.session.commit()
-            # self.assertEqual(retrieved_article.author.username, "testuser") # Test relationship
+            self.assertEqual(retrieved_article.user_id, self.test_user_id)
