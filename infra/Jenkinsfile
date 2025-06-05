@@ -6,8 +6,8 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
-        SSH_PRIVATE_KEY_PATH  = credentials('ec2-ssh-key')
+        SSH_PUBLIC_KEY        = credentials('EC2_SSH_KEY_PUBLIC')
+        SSH_PRIVATE_KEY  = credentials('EC2_SSH_KEY_PRIVATE')
         TF_IN_AUTOMATION      = "true"
     }
     agent any
@@ -88,7 +88,7 @@ pipeline {
                     }
 
                     def inventoryContent = """[flask_servers]
-											${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${env.SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+											${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${env.SSH_PRIVATE_KEY} ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 
 											[flask_servers:vars]
 											rds_endpoint=${env.RDS_ENDPOINT}
