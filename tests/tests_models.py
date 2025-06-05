@@ -1,16 +1,16 @@
 import unittest
-from app import create_app, db
-from app.models import Note # Assuming Note is in app.models
+from app import create_app
+from app.models import db, Note # CHANGED: Import db from app.models, and keep Note
 
-class TestNotes(unittest.TestCase): # CHANGED: Class name now starts with 'Test'
+class TestNotes(unittest.TestCase):
     def setUp(self):
-        self.app = create_app('ConfigTestConfig') # Assuming 'ConfigTestConfig' is valid
+        self.app = create_app('ConfigTestConfig')
         self.client = self.app.test_client()
 
         with self.app.app_context():
             db.create_all()
 
-    def tearDown(self): # Good practice to add a tearDown for cleanup
+    def tearDown(self):
         with self.app.app_context():
             db.session.remove()
             db.drop_all()
