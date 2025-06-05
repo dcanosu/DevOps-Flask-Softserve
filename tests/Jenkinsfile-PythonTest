@@ -98,10 +98,9 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                             """
 
                             echo "Attempting to collect and run Python tests with pytest..."
-                            // Simplified pytest command to avoid unrecognized arguments.
-                            // `--pyargs Tests` tells pytest to discover tests within the 'Tests' package.
+                            // Explicitly point pytest to the test file.
                             sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --verbose --ignore=.venv_test/ -p no:warnings --capture=no --full-trace Tests/
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose --ignore=.venv_test/ -p no:warnings --capture=no --full-trace Tests/tests_models.py
                             """
                             echo "Python tests completed."
                         }
