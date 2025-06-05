@@ -1,4 +1,4 @@
-pipeline { 
+pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
     agent any
 
     // No 'tools' block is used here.
@@ -81,10 +81,15 @@ pipeline {
                             // List contents of the 'Tests' directory to confirm file presence and casing
                             sh 'ls -lR Tests/'
 
-                            echo "Attempting to collect Python tests with pytest (--collect-only)..."
-                            // Path to the Python executable in the venv, now relative to the root.
-                            def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
+                            echo "Current PYTHONPATH: ${env.PYTHONPATH}" // DIAGNOSTIC: Print PYTHONPATH
 
+                            echo "Attempting to import 'app' module as a diagnostic..." // DIAGNOSTIC: Attempt import
+                            def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
+                            sh """
+                                "${venvPythonExecutableAtRoot}" -c "import sys; print('Python sys.path:', sys.path); import app; print('Successfully imported app')"
+                            """
+
+                            echo "Attempting to collect Python tests with pytest (--collect-only)..."
                             // Use --collect-only to diagnose collection issues separately from execution.
                             // Add -s to prevent output capture, and -vv for very verbose output during collection.
                             // Any import errors or test setup issues during collection should show up here.
@@ -114,8 +119,8 @@ pipeline {
         //                     def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
         //                     sh """
         //                         "${venvPythonExecutableAtRoot}" -m pip install flake8
-        //                         "${venvPythonExecutable}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        //                         "${venvPythonExecutable}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
         //                     """
         //                     echo "Code quality check completed."
         //                 }
