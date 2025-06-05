@@ -1,15 +1,13 @@
-pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
+pipeline {
     agent any
 
-    // No 'tools' block is used here.
-    // The pipeline relies on a 'python' executable being available in the agent's PATH,
-    // and then creates and uses a dedicated virtual environment for the build.
+
 
     stages {
         stage('Checkout SCM') {
             steps {
                 script {
-                    // Checkout the latest code from your SCM into the workspace.
+                    
                     checkout scm
                     echo "Repository checked out."
                 }
@@ -19,20 +17,16 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         stage('Setup Python Environment') {
             steps {
                 script {
-                    dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
+                    dir('.') { 
                         echo "Setting up Python virtual environment..."
 
-                        // Create venv in a dedicated directory at the root, e.g., '.venv_test'
-                        // This avoids polluting 'app' directly with venv files.
                         sh 'python -m venv .venv_test'
 
-                        // Define the path to the Python executable within the newly created virtual environment.
+                        
                         def venvPythonExecutable = "./.venv_test/Scripts/python"
 
                         echo "Installing basic Python packages (pip, pytest, cython, setuptools, wheel) into the virtual environment..."
-                        // Install pip and pytest first.
-                        // Crucially, explicitly install cython, setuptools, and wheel. These are often required
-                        // for building other packages from source and might resolve 'pgen' issues indirectly.
+                       
                         sh """
                             "${venvPythonExecutable}" -m pip install --upgrade pip
                             "${venvPythonExecutable}" -m pip install pytest
@@ -40,19 +34,16 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                         """
 
                         echo "Installing dependencies from requirements.txt (located at root)..."
-                        // IMPORTANT: Explicitly set environment variables for PostgreSQL 17 paths.
-                        // This includes setting PG_CONFIG which should guide psycopg2-binary's build.
-                        // We are REMOVING the --global-option flags as they are deprecated and may conflict,
-                        // especially since cython and setuptools are now pre-installed.
+                        
                         withEnv([
-                            "PG_MAJOR=17", // Specify PostgreSQL major version
-                            "PG_VERSION=17.0", // Specify full PostgreSQL version (adjust if different)
-                            "PGHOME=C:/Program Files/PostgreSQL/17", // Base installation directory
-                            "PATH+POSTGRESQL=C:/Program Files/PostgreSQL/17/bin", // Add bin to PATH
-                            "INCLUDE=C:/Program Files/PostgreSQL/17/include", // Add include to INCLUDE path
-                            "LIB=C:/Program Files/PostgreSQL/17/lib", // Add lib to LIB path
-                            // CRITICAL: Explicitly tell psycopg2-binary where to find pg_config
-                            "PG_CONFIG=C:/Program Files/PostgreSQL/17/bin/pg_config.exe" // Point to PG17's pg_config
+                            "PG_MAJOR=17", 
+                            "PG_VERSION=17.0", 
+                            "PGHOME=C:/Program Files/PostgreSQL/17", 
+                            "PATH+POSTGRESQL=C:/Program Files/PostgreSQL/17/bin", 
+                            "INCLUDE=C:/Program Files/PostgreSQL/17/include", 
+                            "LIB=C:/Program Files/PostgreSQL/17/lib", 
+                            
+                            "PG_CONFIG=C:/Program Files/PostgreSQL/17/bin/pg_config.exe" 
                         ]) {
                             sh """
                                 if [ -f requirements.txt ]; then
@@ -73,32 +64,31 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         stage('Run Python Tests') {
             steps {
                 script {
-                    // Set PYTHONPATH for the entire stage using withEnv.
-                    // This ensures the PARENT directory of 'app' is on the Python module search path.
+                    
                     withEnv(["PYTHONPATH=${env.WORKSPACE}"]) {
-                        dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
+                        dir('.') {
                             echo "Verifying test files exist in 'Tests/' directory..."
-                            // List contents of the 'Tests' directory to confirm file presence and casing
+                           
                             sh 'ls -lR Tests/'
 
-                            echo "Verifying tests_models.py content on agent..." // DIAGNOSTIC: Print file content
+                            echo "Verifying tests_models.py content on agent..." 
                             sh 'cat Tests/tests_models.py'
 
-                            echo "Current PYTHONPATH: ${env.PYTHONPATH}" // DIAGNOSTIC: Print PYTHONPATH
+                            echo "Current PYTHONPATH: ${env.PYTHONPATH}" 
 
-                            echo "Attempting to import 'app' module as a diagnostic..." // DIAGNOSTIC: Attempt import
+                            echo "Attempting to import 'app' module as a diagnostic..." 
                             def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
                             sh """
                                 "${venvPythonExecutableAtRoot}" -c "import sys; print('Python sys.path:', sys.path); import app; print('Successfully imported app')"
                             """
 
-                            echo "Attempting to run 'tests_models.py' directly as a diagnostic..." // DIAGNOSTIC: Run test file directly
+                            echo "Attempting to run 'tests_models.py' directly as a diagnostic..."
                             sh """
                                 "${venvPythonExecutableAtRoot}" Tests/tests_models.py
                             """
 
                             echo "Attempting to collect and run Python tests with pytest..."
-                            // Explicitly point pytest to the test file.
+                           
                             sh """
                                 "${venvPythonExecutableAtRoot}" -m pytest --verbose --ignore=.venv_test/ -p no:warnings --capture=no --full-trace Tests/tests_models.py
                             """
@@ -109,35 +99,16 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
             }
         }
 
-        // Optional: Add a stage for linting/code quality checks
-        // stage('Code Quality Check') {
-        //     steps {
-        //         script {
-        //             withEnv(["PYTHONPATH=${env.WORKSPACE}"]) { // Also set PYTHONPATH for linting if needed
-        //                 dir('.') { // Or dir('app') if flake8 should scan only the app directory
-        //                     echo "Running Flake8 for code quality..."
-        //                     def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
-        //                     sh """
-        //                         "${venvPythonExecutableAtRoot}" -m pip install flake8
-        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
-        //                     """
-        //                     echo "Code quality check completed."
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+
     }
 
     post {
         always {
             script {
-                // Clean up the virtual environment regardless of build success or failure.
-                // The 'venv' is located in the root directory.
-                dir('.') { // Changed to root directory
+                
+                dir('.') { 
                     echo "Cleaning up Python virtual environment..."
-                    sh 'rm -rf .venv_test' // Deletes the '.venv_test' directory
+                    sh 'rm -rf .venv_test' 
                     echo "Virtual environment removed."
                 }
             }
