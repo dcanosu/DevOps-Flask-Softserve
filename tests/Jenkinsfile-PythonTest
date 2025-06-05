@@ -1,4 +1,4 @@
-pipeline {
+pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
     agent any
 
     // No 'tools' block is used here.
@@ -81,7 +81,7 @@ pipeline {
                             // List contents of the 'Tests' directory to confirm file presence and casing
                             sh 'ls -lR Tests/'
 
-                            echo "Verifying tests_models.py content on agent..." // NEW DIAGNOSTIC: Print file content
+                            echo "Verifying tests_models.py content on agent..." // DIAGNOSTIC: Print file content
                             sh 'cat Tests/tests_models.py'
 
                             echo "Current PYTHONPATH: ${env.PYTHONPATH}" // DIAGNOSTIC: Print PYTHONPATH
@@ -92,16 +92,17 @@ pipeline {
                                 "${venvPythonExecutableAtRoot}" -c "import sys; print('Python sys.path:', sys.path); import app; print('Successfully imported app')"
                             """
 
-                            echo "Attempting to run 'tests_models.py' directly as a diagnostic..." // NEW DIAGNOSTIC: Run test file directly
+                            echo "Attempting to run 'tests_models.py' directly as a diagnostic..." // DIAGNOSTIC: Run test file directly
                             sh """
                                 "${venvPythonExecutableAtRoot}" Tests/tests_models.py
                             """
 
-                            // Removed --collect-only to ensure we see execution errors if collection works.
-                            // Added --capture=no and --full-trace for more detailed output.
-                            echo "Running Python tests with pytest with maximum verbosity..."
+                            echo "Attempting to collect and run Python tests with pytest (enhanced discovery)..."
+                            // Added --pyargs Tests for explicit package discovery.
+                            // Added --collect-report collect.json to get a detailed report of collection.
+                            // Kept --capture=no and --full-trace for maximum output.
                             sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=.venv_test/ -p no:warnings --capture=no --full-trace
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=.venv_test/ --pyargs Tests --collect-report collect.json -p no:warnings --capture=no --full-trace
                             """
                             echo "Python tests completed."
                         }
