@@ -1,4 +1,4 @@
-pipeline {
+ipeline {
     agent any
 
     // No 'tools' block is used here.
@@ -70,9 +70,10 @@ pipeline {
                         def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
 
                         // Run pytest using the virtual environment's python.
-                        // pytest will automatically discover tests in the 'Tests' subdirectory (e.g., Tests/tests_models.py).
+                        // Explicitly tell pytest to look in the 'Tests' directory.
+                        // This assumes your test files are within the 'Tests' subdirectory (e.g., Tests/tests_models.py).
                         sh """
-                            "${venvPythonExecutableAtRoot}" -m pytest --verbose
+                            "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/
                         """
                         echo "Python tests completed."
                     }
