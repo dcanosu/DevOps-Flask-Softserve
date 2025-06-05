@@ -1,4 +1,4 @@
-pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
+pipeline { 
     agent any
 
     // No 'tools' block is used here.
@@ -19,9 +19,7 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         stage('Setup Python Environment') {
             steps {
                 script {
-                    // We'll create the venv and install dependencies from the workspace root
-                    // because requirements.txt is at the root.
-                    dir('.') { // Changed to root directory
+                    dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
                         echo "Setting up Python virtual environment..."
 
                         // Create venv in a dedicated directory at the root, e.g., '.venv_test'
@@ -31,16 +29,21 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                         // Define the path to the Python executable within the newly created virtual environment.
                         def venvPythonExecutable = "./.venv_test/Scripts/python"
 
-                        echo "Installing basic Python packages (pip, pytest) into the virtual environment..."
-                        // Use the full path to the virtual environment's python to install packages.
+                        echo "Installing basic Python packages (pip, pytest, cython, setuptools, wheel) into the virtual environment..."
+                        // Install pip and pytest first.
+                        // Crucially, explicitly install cython, setuptools, and wheel. These are often required
+                        // for building other packages from source and might resolve 'pgen' issues indirectly.
                         sh """
                             "${venvPythonExecutable}" -m pip install --upgrade pip
                             "${venvPythonExecutable}" -m pip install pytest
+                            "${venvPythonExecutable}" -m pip install cython setuptools wheel
                         """
 
                         echo "Installing dependencies from requirements.txt (located at root)..."
                         // IMPORTANT: Explicitly set environment variables for PostgreSQL 17 paths.
-                        // This includes setting PG_CONFIG and explicitly passing include/lib dirs to pip.
+                        // This includes setting PG_CONFIG which should guide psycopg2-binary's build.
+                        // We are REMOVING the --global-option flags as they are deprecated and may conflict,
+                        // especially since cython and setuptools are now pre-installed.
                         withEnv([
                             "PG_MAJOR=17", // Specify PostgreSQL major version
                             "PG_VERSION=17.0", // Specify full PostgreSQL version (adjust if different)
@@ -53,11 +56,8 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
                         ]) {
                             sh """
                                 if [ -f requirements.txt ]; then
-                                    # Use --global-option to pass arguments directly to setup.py's build_ext
-                                    "${venvPythonExecutable}" -m pip install -r requirements.txt \\
-                                        --global-option="build_ext" \\
-                                        --global-option="-I${env.PGHOME}/include" \\
-                                        --global-option="-L${env.PGHOME}/lib"
+                                    # Removed --global-option as cython is pre-installed and PG_CONFIG should suffice.
+                                    "${venvPythonExecutable}" -m pip install -r requirements.txt
                                     echo "Dependencies installed from requirements.txt"
                                 else
                                     error "ERROR: requirements.txt not found at the repository root! Cannot install dependencies."
@@ -114,8 +114,8 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         //                     def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
         //                     sh """
         //                         "${venvPythonExecutableAtRoot}" -m pip install flake8
-        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        //                         "${venvPythonExecutable}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        //                         "${venvPythonExecutable}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
         //                     """
         //                     echo "Code quality check completed."
         //                 }
