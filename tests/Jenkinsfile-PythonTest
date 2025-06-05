@@ -1,4 +1,4 @@
-pipeline { 
+pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
     agent any
 
     // No 'tools' block is used here.
