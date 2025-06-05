@@ -40,18 +40,24 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
 
                         echo "Installing dependencies from requirements.txt (located at root)..."
                         // IMPORTANT: Explicitly set environment variables for PostgreSQL 17 paths.
-                        // This overrides any system-wide PostgreSQL 16 settings that might be interfering.
+                        // This includes setting PG_CONFIG and explicitly passing include/lib dirs to pip.
                         withEnv([
                             "PG_MAJOR=17", // Specify PostgreSQL major version
                             "PG_VERSION=17.0", // Specify full PostgreSQL version (adjust if different)
                             "PGHOME=C:/Program Files/PostgreSQL/17", // Base installation directory
                             "PATH+POSTGRESQL=C:/Program Files/PostgreSQL/17/bin", // Add bin to PATH
                             "INCLUDE=C:/Program Files/PostgreSQL/17/include", // Add include to INCLUDE path
-                            "LIB=C:/Program Files/PostgreSQL/17/lib" // Add lib to LIB path
+                            "LIB=C:/Program Files/PostgreSQL/17/lib", // Add lib to LIB path
+                            // CRITICAL: Explicitly tell psycopg2-binary where to find pg_config
+                            "PG_CONFIG=C:/Program Files/PostgreSQL/17/bin/pg_config.exe" // Point to PG17's pg_config
                         ]) {
                             sh """
                                 if [ -f requirements.txt ]; then
-                                    "${venvPythonExecutable}" -m pip install -r requirements.txt
+                                    # Use --global-option to pass arguments directly to setup.py's build_ext
+                                    "${venvPythonExecutable}" -m pip install -r requirements.txt \\
+                                        --global-option="build_ext" \\
+                                        --global-option="-I${env.PGHOME}/include" \\
+                                        --global-option="-L${env.PGHOME}/lib"
                                     echo "Dependencies installed from requirements.txt"
                                 else
                                     error "ERROR: requirements.txt not found at the repository root! Cannot install dependencies."
