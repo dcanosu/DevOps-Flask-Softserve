@@ -1,4 +1,4 @@
-pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
+pipeline { 
     agent any
 
     // No 'tools' block is used here.
@@ -19,35 +19,32 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         stage('Setup Python Environment') {
             steps {
                 script {
-                    // Change directory to your Python application's root (e.g., 'app' folder)
-                    // This is where 'requirements.txt' and the virtual environment 'venv' will reside.
-                    dir('app') { // IMPORTANT: Adjust 'app' if your Python code is in a different subdirectory or at the repository root
+                    // We'll create the venv and install dependencies from the workspace root
+                    // because requirements.txt is at the root.
+                    dir('.') { // Changed to root directory
                         echo "Setting up Python virtual environment..."
 
-                        // Create a virtual environment named 'venv'.
-                        // On Windows, 'venv' creates 'venv\Scripts' where the python executable is.
-                        sh 'python -m venv venv'
+                        // Create venv in a dedicated directory at the root, e.g., '.venv_test'
+                        // This avoids polluting 'app' directly with venv files.
+                        sh 'python -m venv .venv_test'
 
                         // Define the path to the Python executable within the newly created virtual environment.
-                        // Using forward slashes as the 'sh' step (e.g., Git Bash) can interpret them on Windows.
-                        // The Python executable is in 'venv/Scripts/' on Windows.
-                        def venvPythonExecutable = "./venv/Scripts/python"
+                        def venvPythonExecutable = "./.venv_test/Scripts/python"
 
                         echo "Installing basic Python packages (pip, pytest) into the virtual environment..."
-                        // Use the full path to the virtual environment's python to install packages.
                         sh """
                             "${venvPythonExecutable}" -m pip install --upgrade pip
                             "${venvPythonExecutable}" -m pip install pytest
                         """
 
-                        echo "Installing dependencies from requirements.txt if present..."
-                        // Check for requirements.txt and install if it exists.
+                        echo "Installing dependencies from requirements.txt (located at root)..."
+                        // Check for requirements.txt at the root and install if it exists.
                         sh """
                             if [ -f requirements.txt ]; then
                                 "${venvPythonExecutable}" -m pip install -r requirements.txt
                                 echo "Dependencies installed from requirements.txt"
                             else
-                                echo "No requirements.txt found. Skipping dependency installation."
+                                error "ERROR: requirements.txt not found at the repository root! Cannot install dependencies."
                             fi
                         """
                         echo "Python environment setup complete."
@@ -60,30 +57,28 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
             steps {
                 script {
                     // Set PYTHONPATH for the entire stage using withEnv.
-                    // IMPORTANT: PYTHONPATH should point to the directory *containing* the 'app' package,
-                    // which is the workspace root itself (env.WORKSPACE).
-                    // This allows 'from app import create_app' to resolve correctly.
-                    withEnv(["PYTHONPATH=${env.WORKSPACE}"]) { // CORRECTED: Changed from '${env.WORKSPACE}/app' to '${env.WORKSPACE}'
-                        dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
+                    // This ensures the PARENT directory of 'app' is on the Python module search path.
+                    // If 'app' is directly under the workspace root, then the workspace root needs to be on PYTHONPATH.
+                    // If 'app' contains the main app.py, then 'app' itself needs to be importable as 'app'.
+                    // So, we set PYTHONPATH to include the workspace root.
+                    withEnv(["PYTHONPATH=${env.WORKSPACE}"]) {
+                        dir('.') { // Current working directory is the workspace root
                             echo "Verifying test files exist in 'Tests/' directory..."
-                            // List contents of the 'Tests' directory to confirm file presence and casing
                             sh 'ls -lR Tests/'
 
                             echo "Attempting to collect Python tests with pytest (--collect-only)..."
-                            // Path to the virtual environment's python executable, relative to the workspace root
-                            def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
+                            // Path to the Python executable in the venv, now relative to the root.
+                            def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
 
-                            // Use --collect-only to diagnose collection issues separately from execution.
-                            // Add -s to prevent output capture, and -vv for very verbose output during collection.
-                            // Any import errors or test setup issues during collection should show up here.
+                            // Run pytest. The `-p no:warnings` helps reduce noise from pytest about certain warnings.
+                            // We explicitly pass the 'Tests/' directory.
                             sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=app/venv/
+                                "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=.venv_test/ -p no:warnings
                             """
 
                             echo "Running Python tests with pytest..."
-                            // This step will run the actual tests. It might fail if collection still yields 0 items.
                             sh """
-                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=app/venv/
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=.venv_test/ -p no:warnings
                             """
                             echo "Python tests completed."
                         }
@@ -96,10 +91,10 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
         // stage('Code Quality Check') {
         //     steps {
         //         script {
-        //             withEnv(["PYTHONPATH=${env.WORKSPACE}"]) { // Also set PYTHONPATH for linting if needed
-        //                 dir('.') { // Or dir('app') if flake8 should scan only the app directory
+        //             withEnv(["PYTHONPATH=${env.WORKSPACE}"]) {
+        //                 dir('.') {
         //                     echo "Running Flake8 for code quality..."
-        //                     def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
+        //                     def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
         //                     sh """
         //                         "${venvPythonExecutableAtRoot}" -m pip install flake8
         //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -116,11 +111,10 @@ pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
     post {
         always {
             script {
-                // Clean up the virtual environment regardless of build success or failure.
-                // The 'venv' is located inside the 'app' directory.
-                dir('app') {
+                // Clean up the virtual environment, now at the root.
+                dir('.') { // Changed to root directory
                     echo "Cleaning up Python virtual environment..."
-                    sh 'rm -rf venv' // Deletes the 'venv' directory
+                    sh 'rm -rf .venv_test' // Deletes the '.venv_test' directory
                     echo "Virtual environment removed."
                 }
             }
