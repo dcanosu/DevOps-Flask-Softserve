@@ -1,47 +1,46 @@
 pipeline {
     parameters {
         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
-    } 
+        string(name: 'ANSIBLE_VAULT_CREDENTIAL_ID', defaultValue: 'ansible-vault-password', description: 'Jenkins credential ID for Ansible Vault password')
+    }
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-				SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
-				SSH_PRIVATE_KEY_PATH    = credentials('ec2-ssh-key')
+        SSH_PUBLIC_KEY        = credentials('ec2-ssh-key-public')
+        SSH_PRIVATE_KEY_PATH  = credentials('ec2-ssh-key')
+        TF_IN_AUTOMATION      = "true"
     }
     agent any
     tools {
         terraform 'terraform'
-				ansible 'ansible'
+        ansible 'ansible'
     }
     stages {
         stage('Verify Setup') {
             steps {
                 sh 'terraform --version'
                 sh 'ansible --version'
+                sh 'ansible-lint --version || echo "ansible-lint not found, skipping linting"'
             }
         }
 
-        stage('Plan') {
+        stage('Validate Terraform') {
             steps {
-							withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
-                // Clean up any hanging processes and reinitialize
-                sh '''
-                    cd infra
-										# Remove any existing lock files
-										rm -f .terraform.tfstate.lock.info
-										rm -f .terraform.lock.hcl
-										rm -rf .terraform/
-										# Also clean the state file if it's corrupted
-										rm -f terraform.tfstate
-										echo "Cleaned previous terraform state and locks"
-                '''
-                
-								sh 'cd infra && terraform init'
-                
-								sh 'cd infra && terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan'
-                
-                sh 'cd infra && terraform show -no-color tfplan > tfplan.txt'
-							}
+                dir('infra') {
+                    sh 'terraform init -input=false'
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('Plan Terraform') {
+            steps {
+                dir('infra') {
+                    withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
+                        sh 'terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan -input=false'
+                        sh 'terraform show -no-color tfplan > tfplan.txt'
+                    }
+                }
             }
         }
 
@@ -53,55 +52,98 @@ pipeline {
            }
            steps {
                script {
-                    def plan = readFile 'infra/tfplan.txt'
-                    input message: "Do you want to apply the plan?",
-                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                    def planOutput = readFile 'infra/tfplan.txt'
+                    input message: "Review Terraform Plan and Approve to Apply",
+                          submitterParameter: 'TERRAFORM_APPROVED_BY',
+                          parameters: [
+                              text(name: 'PLAN_DETAILS', 
+                                   description: 'Terraform Plan Output (scroll to review):',
+                                   defaultValue: planOutput, 
+                                   isRepoScmUrl: false)
+                          ]
                }
            }
        }
 
-        stage('Apply') {
+        stage('Apply Terraform') {
             steps {
-                sh 'cd infra && terraform apply -input=false tfplan'
+                dir('infra') {
+                    sh 'terraform apply -input=false tfplan'
+                }
             }
         }
 
-				stage('Get Terraform Outputs') {
-					steps {
-						dir('infra') {
-							sh 'terraform output -json > outputs.json'
-						}
-
-						script {
-							def tf = readJSON file: 'infra/outputs.json'
-							env.EC2_IP       = tf.ec2_public_ip.value
-							env.RDS_ENDPOINT = tf.rds_endpoint.value
-
-							 writeFile file: 'infra/ansible/inventory.ini', text: """[flask_servers]
-                                ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-
-								[flask_servers:vars]
-								rds_endpoint=${env.RDS_ENDPOINT}
-							"""
-						}
-					}
-				}
-
-				stage('Ansible: Test Connectivity') {
+        stage('Get Terraform Outputs & Generate Inventory') {
             steps {
-                sh 'ansible-playbook -i infra/ansible/inventory.ini infra/ansible/playbooks/test_connections.yml'
+                dir('infra') {
+                    sh 'terraform output -json > outputs.json'
+                }
+                script {
+                    def tfOutputs = readJSON file: 'infra/outputs.json'
+                    env.EC2_IP       = tfOutputs.ec2_public_ip?.value ?: ''
+                    env.RDS_ENDPOINT = tfOutputs.rds_endpoint?.value ?: ''
+
+                    if (env.EC2_IP == '') {
+                        echo "Warning: EC2_IP not found in Terraform outputs. Ansible inventory might be incomplete."
+                    }
+
+                    def inventoryContent = """[flask_servers]
+											${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${env.SSH_PRIVATE_KEY_PATH} ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+											[flask_servers:vars]
+											rds_endpoint=${env.RDS_ENDPOINT}
+										"""
+
+                    writeFile file: 'infra/ansible/inventory.ini', text: inventoryContent
+                    echo "Ansible inventory generated. EC2_IP: ${env.EC2_IP}"
+                }
             }
         }
-		}
+
+        stage('Ansible: Lint Playbooks') {
+            steps {
+                dir('infra/ansible') {
+                    sh 'ansible-lint playbooks/*.yml || echo "Ansible linting failed or ansible-lint not found"'
+                }
+            }
+        }
+
+        stage('Ansible: Test Connectivity') {
+            steps {
+                dir('infra/ansible') {
+                    sh "ansible-playbook -i inventory.ini playbooks/test_connections.yml"
+                }
+            }
+        }
+
+        stage('Ansible: Deploy Application') {
+            steps {
+                dir('infra/ansible') {
+                    withCredentials([string(credentialsId: params.ANSIBLE_VAULT_CREDENTIAL_ID, variable: 'VAULT_PASSWORD')]) {
+                        sh 'echo "${VAULT_PASSWORD}" > .vault_pass.txt'
+                        sh 'chmod 600 .vault_pass.txt'
+                        sh "ansible-playbook -i inventory.ini playbooks/deploy_main_app.yml --vault-password-file .vault_pass.txt"
+                        sh 'rm -f .vault_pass.txt'
+                    }
+                }
+            }
+        }
+    }
     post {
         always {
-            sh 'cd infra && rm -f tfplan tfplan.txt || echo "No temp files to clean"'
+            dir('infra') {
+                sh 'rm -f tfplan tfplan.txt outputs.json || echo "No temp Terraform files to clean"'
+            }
+            dir('infra/ansible') {
+                 sh 'rm -f .vault_pass.txt || echo "No temp Ansible files to clean"'
+            }
+            cleanWs()
         }
         success {
-            echo "EC2 and RDS instance 'flask-app-dev' deployed successfully!"
+            echo "Pipeline completed successfully. Application should be deployed/updated."
         }
         failure {
-            echo "Deployment failed. Check logs above."
+            echo "Pipeline failed. Check logs for details."
         }
     }
 }
