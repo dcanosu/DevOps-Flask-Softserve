@@ -1,7 +1,9 @@
-
-pipeline { 
+pipeline { // This MUST be 'pipeline' with a lowercase 'p' at the start.
     agent any
 
+    // No 'tools' block is used here.
+    // The pipeline relies on a 'python' executable being available in the agent's PATH,
+    // and then creates and uses a dedicated virtual environment for the build.
 
     stages {
         stage('Checkout SCM') {
@@ -57,33 +59,33 @@ pipeline {
         stage('Run Python Tests') {
             steps {
                 script {
-                    // Change directory to the workspace root.
-                    // This allows pytest to discover test files located in subdirectories
-                    // like 'Tests/' which might be parallel to the 'app/' directory.
-                    dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
-                        echo "Verifying test files exist in 'Tests/' directory..."
-                        // List contents of the 'Tests' directory to confirm file presence and casing
-                        sh 'ls -lR Tests/'
+                    // Set PYTHONPATH for the entire stage using withEnv.
+                    // This ensures 'app' is on the Python module search path.
+                    // Ensure your 'app' directory contains an empty '__init__.py' file!
+                    withEnv(["PYTHONPATH=${env.WORKSPACE}/app"]) {
+                        dir('.') { // Current working directory is now C:\ProgramData\Jenkins\.jenkins\workspace\flask-app-python-tests
+                            echo "Verifying test files exist in 'Tests/' directory..."
+                            // List contents of the 'Tests' directory to confirm file presence and casing
+                            sh 'ls -lR Tests/'
 
-                        echo "Attempting to collect Python tests with pytest (--collect-only)..."
-                        def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
+                            echo "Attempting to collect Python tests with pytest (--collect-only)..."
+                            // Path to the virtual environment's python executable, relative to the workspace root
+                            def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
 
-                        // Set PYTHONPATH to include the 'app' directory, allowing 'from app import ...' to work.
-                        // The '.' means the current directory (workspace root) is also on the path.
-                        // Using '$PYTHONPATH:' ensures we append to any existing path, if applicable.
-                        sh """
-                            export PYTHONPATH=\$PYTHONPATH:./app
-                            "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=app/venv/
-                        """
+                            // Use --collect-only to diagnose collection issues separately from execution.
+                            // Add -s to prevent output capture, and -vv for very verbose output during collection.
+                            // Any import errors or test setup issues during collection should show up here.
+                            sh """
+                                "${venvPythonExecutableAtRoot}" -m pytest --collect-only -s -vv Tests/ --ignore=app/venv/
+                            """
 
-                        echo "Running Python tests with pytest..."
-                        // This step will run the actual tests. It might fail if collection still yields 0 items.
-                        // Ensure PYTHONPATH is also set for the actual test run.
-                        sh """
-                            export PYTHONPATH=\$PYTHONPATH:./app
-                            "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=app/venv/
-                        """
-                        echo "Python tests completed."
+                            echo "Running Python tests with pytest..."
+                            // This step will run the actual tests. It might fail if collection still yields 0 items.
+                            sh """
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose Tests/ --ignore=app/venv/
+                            """
+                            echo "Python tests completed."
+                        }
                     }
                 }
             }
@@ -93,31 +95,18 @@ pipeline {
         // stage('Code Quality Check') {
         //     steps {
         //         script {
-        //             // Decide the directory based on where you want Flake8 to scan.
-        //             // If scanning the entire repository (e.g., app/, Tests/, etc.):
-        //             dir('.') {
-        //                 echo "Running Flake8 for code quality..."
-        //                 def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
-        //                 sh """
-        //                     export PYTHONPATH=\$PYTHONPATH:./app
-        //                     "${venvPythonExecutableAtRoot}" -m pip install flake8
-        //                     "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        //                     "${venvPythonExecutableAtRoot}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
-        //                 """
-        //                 echo "Code quality check completed."
+        //             withEnv(["PYTHONPATH=${env.WORKSPACE}/app"]) { // Also set PYTHONPATH for linting if needed
+        //                 dir('.') { // Or dir('app') if flake8 should scan only the app directory
+        //                     echo "Running Flake8 for code quality..."
+        //                     def venvPythonExecutableAtRoot = "./app/venv/Scripts/python"
+        //                     sh """
+        //                         "${venvPythonExecutableAtRoot}" -m pip install flake8
+        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        //                         "${venvPythonExecutableAtRoot}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        //                     """
+        //                     echo "Code quality check completed."
+        //                 }
         //             }
-        //             // If scanning only the 'app' directory:
-        //             // dir('app') {
-        //             //     echo "Running Flake8 for code quality..."
-        //             //     def venvPythonExecutable = "./venv/Scripts/python"
-        //             //     sh """
-        //             //         export PYTHONPATH=\$PYTHONPATH:./app
-        //             //         "${venvPythonExecutable}" -m pip install flake8
-        //             //         "${venvPythonExecutable}" -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        //             //         "${venvPythonExecutable}" -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
-        //             //     """
-        //             //     echo "Code quality check completed."
-        //             // }
         //         }
         //     }
         // }
