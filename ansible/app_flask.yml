@@ -1,0 +1,254 @@
+# ---
+# - name: Set up Flask App on Ubuntu Server
+#   hosts: ec2
+#   become: yes
+
+#   vars:
+#     app_dir: /var/wwww/app-flask
+#     venv_dir: "{{ app_dir }}/venv"
+#     requirements:
+#       - Flask==3.1.0
+#       - Flask-SQLAlchemy==3.1.1
+#       - psycopg2-binary
+#       - python-dotenv
+
+#   tasks:
+
+#     - name: Update and upgrade system packages
+#       apt:
+#         update_cache: yes
+#         upgrade: dist
+#         autoremove: yes
+
+#     - name: Install system dependencies for Python
+#       apt:
+#         name:
+#           - python3
+#           - python3-pip
+#           - python3-venv
+#         state: present
+
+#     - name: Create application directory
+#       file:
+#         path: "{{ app_dir }}"
+#         state: directory
+#         mode: '0755'
+#         owner: ubuntu
+#         group: ubuntu
+
+#     - name: Create Python virtual environment
+#       command: python3 -m venv "{{ venv_dir }}"
+#       args:
+#         creates: "{{ venv_dir }}"
+
+#     - name: Install Python dependencies in virtualenv
+#       pip:
+#         name: "{{ requirements }}"
+#         virtualenv: "{{ venv_dir }}"
+#         virtualenv_command: python3 -m venv
+
+#     - name: Copy Flask app to server
+#       copy:
+#         src: "{{ playbook_dir }}/../app/"
+#         dest: "{{ app_dir }}/"
+#         owner: ubuntu
+#         group: ubuntu
+#         mode: '0755'
+#         directory_mode: yes
+#     - name: Install additional system dependencies
+#       apt:
+#         name:
+#           - python3-dev
+#           - libpq-dev
+#           - nginx
+#           - postgresql
+#           - postgresql-contrib
+#         state: present
+
+#     - name: Create .env file with DB config
+#       copy:
+#         dest: "{{ app_dir }}/.env"
+#         content: |
+#           DATABASE_URL=postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/{{ db_name }}
+#         owner: ubuntu
+#         group: ubuntu
+#         mode: '0644'
+
+#     - name: Create PostgreSQL database
+#       become_user: postgres
+#       postgresql_db:
+#         name: "{{ db_name }}"
+
+#     - name: Run Flask DB migrations
+#       shell: |
+#         source "{{ venv_dir }}/bin/activate"
+#         flask db upgrade
+#       args:
+#         chdir: "{{ app_dir }}"
+#       environment:
+#         FLASK_APP: app.py
+
+
+---
+- name: Set up Article Pool Flask App on Ubuntu Server
+  hosts: ec2
+  become: yes
+
+  vars:
+    app_dir: /var/www/article_pool
+    repo_url: https://github.com/dcanosu/DevOps-Flask-Softserve.git
+    venv_dir: "{{ app_dir }}/venv"
+    env_file: "{{ app_dir }}/.env"
+    db_user: postgres
+    db_password: postgres
+    db_host: your-rds-endpoint
+    db_port: 5432
+    db_name: db_app_flask
+    secret_key: your-secure-secret-key
+    domain: artcilepoolsoftserve.live  # REVISAR el typo en "article"
+
+  tasks:
+    - name: Update and upgrade system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+
+    - name: Install system dependencies
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - nginx
+          - postgresql-client
+          - libpq-dev
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Clone Flask repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: HEAD
+        force: yes
+
+    - name: Create Python virtual environment
+      command: python3 -m venv "{{ venv_dir }}"
+      args:
+        creates: "{{ venv_dir }}"
+
+    - name: Install Python dependencies from requirements.txt
+      pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ venv_dir }}"
+        virtualenv_command: python3 -m venv
+
+    - name: Create .env file
+      copy:
+        dest: "{{ env_file }}"
+        content: |
+          export FLASK_ENV="production"
+          export SECRET_KEY="{{ secret_key }}"
+          export DATABASE_URL="postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/{{ db_name }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: Create systemd service for Gunicorn
+      copy:
+        dest: /etc/systemd/system/article_pool.service
+        content: |
+          [Unit]
+          Description=Gunicorn instance for Article Pool
+          After=network.target
+
+          [Service]
+          User=ubuntu
+          Group=www-data
+          WorkingDirectory={{ app_dir }}
+          Environment="PATH={{ venv_dir }}/bin"
+          EnvironmentFile={{ env_file }}
+          ExecStart={{ venv_dir }}/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:application
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Enable and start Gunicorn
+
+    - name: Configure Nginx for Article Pool
+      copy:
+        dest: /etc/nginx/sites-available/article_pool
+        content: |
+          server {
+              listen 80;
+              server_name {{ domain }};
+
+              location /static {
+                  alias {{ app_dir }}/app/static;
+              }
+
+              location / {
+                  proxy_pass http://127.0.0.1:8000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+      notify:
+        - Enable Nginx site
+        - Restart Nginx
+
+    # - name: Run Flask DB migrations
+    #   shell: |
+    #     source "{{ venv_dir }}/bin/activate"
+    #     flask db upgrade
+    #     python3 -m app.create_db
+    #   args:
+    #     chdir: "{{ app_dir }}"
+    #   environment:
+    #     FLASK_APP: wsgi.py  # O cambiar según tu estructura
+
+    - name: Run Flask DB migrations and create DB
+      shell: |
+        . "{{ venv_dir }}/bin/activate"
+        export FLASK_APP=app.py
+        flask db upgrade
+        python3 -m app.create_db
+      args:
+        chdir: "{{ app_dir }}"
+        executable: /bin/bash
+
+
+  handlers:
+    - name: Reload systemd
+      command: systemctl daemon-reexec
+
+    - name: Enable and start Gunicorn
+      systemd:
+        name: article_pool
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/article_pool
+        dest: /etc/nginx/sites-enabled/article_pool
+        state: link
+        force: yes
+
+    - name: Restart Nginx
+      systemd:
+        name: nginx
+        state: restarted

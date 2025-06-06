@@ -1,1 +1,0 @@
-rds_endpoint: "{{ lookup('env','RDS_ENDPOINT') }}"
