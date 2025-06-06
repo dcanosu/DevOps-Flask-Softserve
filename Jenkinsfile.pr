@@ -1,0 +1,128 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        SSH_PUBLIC_KEY        = credentials('EC2_SSH_KEY_PUBLIC') 
+        TF_IN_AUTOMATION      = "true"
+        GITHUB_PAT            = credentials('github-token') 
+    }
+
+    tools {
+        terraform 'terraform'
+    }
+
+    stages {
+        stage('Initialize Terraform') {
+            steps {
+                dir('infra') {
+                    sh 'terraform init -input=false'
+                }
+            }
+        }
+
+        stage('Generate Terraform Plan for PR') {
+            steps {
+                dir('infra') {
+                    withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
+                        sh 'terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan.pr -input=false'
+                        sh 'terraform show -no-color tfplan.pr > tfplan.pr.txt'
+                    }
+                    script {
+                        stash name: 'terraform-plan-pr', includes: 'infra/tfplan.pr.txt'
+                    }
+                }
+            }
+        }
+
+        stage('Publish Plan to Gist and Comment on PR') {
+            when {
+                expression { env.CHANGE_ID != null && env.CHANGE_URL != null }
+            }
+            steps {
+                script {
+                    def githubOwner = ''
+                    def githubRepo = ''
+                    
+                    if (env.CHANGE_URL) {
+                        def matcher = (env.CHANGE_URL =~ /github\.com\/([^\/]+)\/([^\/]+)\/pull\/\d+/)
+                        if (matcher.find()) {
+                            githubOwner = matcher[0][1]
+                            githubRepo = matcher[0][2]
+                            echo "Propietario GitHub: ${githubOwner}, Repositorio GitHub: ${githubRepo}"
+                        } else {
+                            error "No se pudo extraer propietario/repositorio de CHANGE_URL: ${env.CHANGE_URL}"
+                        }
+                    } else {
+                        error "La variable de entorno CHANGE_URL no fue encontrada. No se puede determinar el repositorio de GitHub."
+                    }
+
+                    unstash 'terraform-plan-pr'
+                    def planOutput = readFile 'infra/tfplan.pr.txt'
+                    def prNumber = env.CHANGE_ID
+                    def gistDescription = "Terraform Plan para PR #${prNumber} en ${githubRepo}"
+                    
+                    // Crear payload para Gist
+                    def gistPayloadJson = [
+                        description: gistDescription,
+                        public: false, // Crea un Gist secreto/privado. Cambia a true para público.
+                        files: [
+                            "terraform-plan-PR${prNumber}.txt": [ // Nombre de archivo en el Gist
+                                content: planOutput
+                            ]
+                        ]
+                    ]
+                    writeFile file: 'gist_payload.json', text: groovy.json.JsonOutput.toJson(gistPayloadJson)
+                    
+                    // Publicar Gist
+                    def gistApiResponse = sh(
+                        script: """
+                            curl -s -X POST \
+                                 -H "Authorization: token ${env.GITHUB_PAT}" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 https://api.github.com/gists \
+                                 -d @gist_payload.json
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    def gistResponseData = readJSON text: gistApiResponse // Parsea la respuesta JSON
+                    def gistUrl = gistResponseData.html_url
+
+                    if (gistUrl) {
+                        echo "Plan de Terraform publicado en Gist: ${gistUrl}"
+
+                        // Crear payload para comentario en PR
+                        def commentBody = "Plan de Terraform para este PR ha sido generado y publicado en un Gist: [Ver Plan](${gistUrl})"
+                        def commentPayloadJson = [ body: commentBody ]
+                        writeFile file: 'comment_payload.json', text: groovy.json.JsonOutput.toJson(commentPayloadJson)
+
+                        // Comentar en PR
+                        sh """
+                            curl -s -X POST \
+                                 -H "Authorization: token ${env.GITHUB_PAT}" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 "https://api.github.com/repos/${githubOwner}/${githubRepo}/issues/${prNumber}/comments" \
+                                 -d @comment_payload.json
+                        """
+                        echo "Comentario publicado en PR #${prNumber} con enlace al Gist."
+                    } else {
+                        echo "Respuesta de la API de Gist: ${gistApiResponse}"
+                        error "Fallo al crear Gist o extraer URL del Gist."
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            dir('infra') {
+                sh 'rm -f tfplan.pr tfplan.pr.txt || echo "No hay archivos temporales de plan de PR para limpiar"'
+            }
+            sh 'rm -f gist_payload.json comment_payload.json || echo "No hay archivos temporales de payload para limpiar"'
+            cleanWs()
+        }
+    }
+}
