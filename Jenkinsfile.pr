@@ -28,8 +28,12 @@ pipeline {
                     withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
                         sh 'terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan.pr -input=false'
                         sh 'terraform show -no-color tfplan.pr > tfplan.pr.txt'
+                        sh 'echo "--- Content of tfplan.pr.txt:"'
+                        sh 'cat tfplan.pr.txt'
+                        sh 'ls -l tfplan.pr.txt' // Verificar que existe y tiene contenido dentro de dir(infra)
                     }
                     script {
+                        sh 'ls -l infra/tfplan.pr.txt' // Verificar desde la raíz del workspace
                         stash name: 'terraform-plan-pr', includes: 'infra/tfplan.pr.txt'
                     }
                 }
