@@ -1,0 +1,124 @@
+pipeline {
+    agent any
+
+
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                script {
+                    
+                    checkout scm
+                    echo "Repository checked out."
+                }
+            }
+        }
+
+        stage('Setup Python Environment') {
+            steps {
+                script {
+                    dir('.') { 
+                        echo "Setting up Python virtual environment..."
+
+                        sh 'python -m venv .venv_test'
+
+                        
+                        def venvPythonExecutable = "./.venv_test/Scripts/python"
+
+                        echo "Installing basic Python packages (pip, pytest, cython, setuptools, wheel) into the virtual environment..."
+                       
+                        sh """
+                            "${venvPythonExecutable}" -m pip install --upgrade pip
+                            "${venvPythonExecutable}" -m pip install pytest
+                            "${venvPythonExecutable}" -m pip install cython setuptools wheel
+                        """
+
+                        echo "Installing dependencies from requirements.txt (located at root)..."
+                        
+                        withEnv([
+                            "PG_MAJOR=17", 
+                            "PG_VERSION=17.0", 
+                            "PGHOME=C:/Program Files/PostgreSQL/17", 
+                            "PATH+POSTGRESQL=C:/Program Files/PostgreSQL/17/bin", 
+                            "INCLUDE=C:/Program Files/PostgreSQL/17/include", 
+                            "LIB=C:/Program Files/PostgreSQL/17/lib", 
+                            
+                            "PG_CONFIG=C:/Program Files/PostgreSQL/17/bin/pg_config.exe" 
+                        ]) {
+                            sh """
+                                if [ -f requirements.txt ]; then
+                                    # Removed --global-option as cython is pre-installed and PG_CONFIG should suffice.
+                                    "${venvPythonExecutable}" -m pip install -r requirements.txt
+                                    echo "Dependencies installed from requirements.txt"
+                                else
+                                    error "ERROR: requirements.txt not found at the repository root! Cannot install dependencies."
+                                fi
+                            """
+                        }
+                        echo "Python environment setup complete."
+                    }
+                }
+            }
+        }
+
+        stage('Run Python Tests') {
+            steps {
+                script {
+                    
+                    withEnv(["PYTHONPATH=${env.WORKSPACE}"]) {
+                        dir('.') {
+                            echo "Verifying test files exist in 'Tests/' directory..."
+                           
+                            sh 'ls -lR Tests/'
+
+                            echo "Verifying tests_models.py content on agent..." 
+                            sh 'cat Tests/tests_models.py'
+
+                            echo "Current PYTHONPATH: ${env.PYTHONPATH}" 
+
+                            echo "Attempting to import 'app' module as a diagnostic..." 
+                            def venvPythonExecutableAtRoot = "./.venv_test/Scripts/python"
+                            sh """
+                                "${venvPythonExecutableAtRoot}" -c "import sys; print('Python sys.path:', sys.path); import app; print('Successfully imported app')"
+                            """
+
+                            echo "Attempting to run 'tests_models.py' directly as a diagnostic..."
+                            sh """
+                                "${venvPythonExecutableAtRoot}" Tests/tests_models.py
+                            """
+
+                            echo "Attempting to collect and run Python tests with pytest..."
+                           
+                            sh """
+                                "${venvPythonExecutableAtRoot}" -m pytest --verbose --ignore=.venv_test/ -p no:warnings --capture=no --full-trace Tests/tests_models.py
+                            """
+                            echo "Python tests completed."
+                        }
+                    }
+                }
+            }
+        }
+
+
+    }
+
+    post {
+        always {
+            script {
+                
+                dir('.') { 
+                    echo "Cleaning up Python virtual environment..."
+                    sh 'rm -rf .venv_test' 
+                    echo "Virtual environment removed."
+                }
+            }
+            echo 'Python testing pipeline finished.'
+        }
+        success {
+            echo '✅ Python application tests passed successfully!'
+        }
+        failure {
+            echo '❌ Python application tests failed. Check logs above.'
+        }
+    }
+}

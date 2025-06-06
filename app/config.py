@@ -1,18 +1,23 @@
 import os
 
 class Config:
-    # Database - usando variables de entorno
+    
     DB_USER = os.environ.get('DB_USER', 'flask_user')
     DB_PASSWORD = os.environ.get('DB_PASSWORD', 'flask_password')
     DB_HOST = os.environ.get('DB_HOST', 'localhost')
-    DB_PORT = os.environ.get('DB_PORT', '5432')
+    DB_PORT = os.environ.get('DB_PORT', '5432') # Ensure this is 5432
     DB_NAME = os.environ.get('DB_NAME', 'flask_notes_db')
-    
+
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
     
-    # Security
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {"connect_timeout": 60} 
+    }
+
+    
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-production'
 
 class TestConfig(Config):
