@@ -19,17 +19,17 @@ output "public_ip" {
 ###############################
 
 output "rds_status" {
-  value = module.rds_db_app_flask.status
+  value = module.rds.rds_status
 }
 
 output "rds_endpoint" {
-  value = module.rds_db_app_flask.rds_endpoint
+  value = module.rds.rds_endpoint
 }
 
 output "rds_db_name" {
-  value = module.rds_db_app_flask.rds_db_name
+  value = module.rds.rds_db_name
 }
 
 output "rds_port" {
-  value = module.rds_db_app_flask.rds_port
+  value = module.rds.rds_port
 }
