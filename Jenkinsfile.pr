@@ -32,10 +32,20 @@ pipeline {
                         sh 'cat tfplan.pr.txt'
                         sh 'ls -l tfplan.pr.txt' // Verificar que existe y tiene contenido dentro de dir(infra)
                     }
-                    script {
-                        sh 'ls -l infra/tfplan.pr.txt' // Verificar desde la raíz del workspace
-                        stash name: 'terraform-plan-pr', includes: 'infra/tfplan.pr.txt'
-                    }
+                } // End of dir('infra') block
+
+                // This script block is now OUTSIDE dir('infra'), at the workspace root level
+                script {
+                    sh 'echo "--- Current directory before stash (should be workspace root):"'
+                    sh 'pwd'
+                    sh 'echo "--- Listing contents of infra directory from workspace root:"'
+                    sh 'ls -l infra/' // Optional: verify 'infra' directory contents
+                    sh 'echo "--- Verifying infra/tfplan.pr.txt from workspace root:"'
+                    sh 'ls -l infra/tfplan.pr.txt' // Should now work
+
+                    // Stash the file using its path relative to the workspace root
+                    stash name: 'terraform-plan-pr', includes: 'infra/tfplan.pr.txt'
+                    echo "Stashed infra/tfplan.pr.txt"
                 }
             }
         }
