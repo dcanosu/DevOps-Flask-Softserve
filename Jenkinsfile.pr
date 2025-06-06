@@ -28,24 +28,12 @@ pipeline {
                     withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
                         sh 'terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan.pr -input=false'
                         sh 'terraform show -no-color tfplan.pr > tfplan.pr.txt'
-                        sh 'echo "--- Content of tfplan.pr.txt:"'
-                        sh 'cat tfplan.pr.txt'
-                        sh 'ls -l tfplan.pr.txt' // Verificar que existe y tiene contenido dentro de dir(infra)
                     }
-                } // End of dir('infra') block
+                }
 
-                // This script block is now OUTSIDE dir('infra'), at the workspace root level
                 script {
-                    sh 'echo "--- Current directory before stash (should be workspace root):"'
-                    sh 'pwd'
-                    sh 'echo "--- Listing contents of infra directory from workspace root:"'
-                    sh 'ls -l infra/' // Optional: verify 'infra' directory contents
-                    sh 'echo "--- Verifying infra/tfplan.pr.txt from workspace root:"'
-                    sh 'ls -l infra/tfplan.pr.txt' // Should now work
-
-                    // Stash the file using its path relative to the workspace root
                     stash name: 'terraform-plan-pr', includes: 'infra/tfplan.pr.txt'
-                    echo "Stashed infra/tfplan.pr.txt"
+                    echo "Terraform plan stashed."
                 }
             }
         }
@@ -64,32 +52,32 @@ pipeline {
                         if (matcher.find()) {
                             githubOwner = matcher[0][1]
                             githubRepo = matcher[0][2]
-                            echo "Propietario GitHub: ${githubOwner}, Repositorio GitHub: ${githubRepo}"
+                            echo "GitHub Owner: ${githubOwner}, GitHub Repo: ${githubRepo}"
                         } else {
-                            error "No se pudo extraer propietario/repositorio de CHANGE_URL: ${env.CHANGE_URL}"
+                            error "Could not extract owner/repository from CHANGE_URL: ${env.CHANGE_URL}"
                         }
                     } else {
-                        error "La variable de entorno CHANGE_URL no fue encontrada. No se puede determinar el repositorio de GitHub."
+                        error "CHANGE_URL environment variable not found. Cannot determine GitHub repository."
                     }
 
                     unstash 'terraform-plan-pr'
                     def planOutput = readFile 'infra/tfplan.pr.txt'
                     def prNumber = env.CHANGE_ID
-                    def gistDescription = "Terraform Plan para PR #${prNumber} en ${githubRepo}"
+                    def gistDescription = "Terraform Plan for PR #${prNumber} in ${githubRepo}"
                     
-                    // Crear payload para Gist
+                    // Create Gist payload
                     def gistPayloadJson = [
                         description: gistDescription,
-                        public: false, // Crea un Gist secreto/privado. Cambia a true para público.
+                        public: false, // Creates a secret/private Gist. Change to true for public.
                         files: [
-                            "terraform-plan-PR${prNumber}.txt": [ // Nombre de archivo en el Gist
+                            "terraform-plan-PR${prNumber}.txt": [ // Filename in Gist
                                 content: planOutput
                             ]
                         ]
                     ]
                     writeFile file: 'gist_payload.json', text: groovy.json.JsonOutput.toJson(gistPayloadJson)
                     
-                    // Publicar Gist
+                    // Publish Gist
                     def gistApiResponse = sh(
                         script: """
                             curl -s -X POST \
@@ -101,18 +89,17 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    def gistResponseData = readJSON text: gistApiResponse // Parsea la respuesta JSON
+                    def gistResponseData = readJSON text: gistApiResponse
                     def gistUrl = gistResponseData.html_url
 
                     if (gistUrl) {
-                        echo "Plan de Terraform publicado en Gist: ${gistUrl}"
+                        echo "Terraform plan published to Gist: ${gistUrl}"
 
-                        // Crear payload para comentario en PR
-                        def commentBody = "Plan de Terraform para este PR ha sido generado y publicado en un Gist: [Ver Plan](${gistUrl})"
+                        def commentBody = "Terraform plan for this PR has been generated and published to a Gist: [View Plan](${gistUrl})"
                         def commentPayloadJson = [ body: commentBody ]
                         writeFile file: 'comment_payload.json', text: groovy.json.JsonOutput.toJson(commentPayloadJson)
 
-                        // Comentar en PR
+                        // Comment on PR
                         sh """
                             curl -s -X POST \
                                  -H "Authorization: token ${env.GITHUB_PAT}" \
@@ -120,10 +107,10 @@ pipeline {
                                  "https://api.github.com/repos/${githubOwner}/${githubRepo}/issues/${prNumber}/comments" \
                                  -d @comment_payload.json
                         """
-                        echo "Comentario publicado en PR #${prNumber} con enlace al Gist."
+                        echo "Comment posted to PR #${prNumber} with Gist link."
                     } else {
-                        echo "Respuesta de la API de Gist: ${gistApiResponse}"
-                        error "Fallo al crear Gist o extraer URL del Gist."
+                        echo "Gist API Response: ${gistApiResponse}"
+                        error "Failed to create Gist or extract Gist URL."
                     }
                 }
             }
@@ -133,9 +120,9 @@ pipeline {
     post {
         always {
             dir('infra') {
-                sh 'rm -f tfplan.pr tfplan.pr.txt || echo "No hay archivos temporales de plan de PR para limpiar"'
+                sh 'rm -f tfplan.pr tfplan.pr.txt || echo "No temporary PR plan files to clean up in infra"'
             }
-            sh 'rm -f gist_payload.json comment_payload.json || echo "No hay archivos temporales de payload para limpiar"'
+            sh 'rm -f gist_payload.json comment_payload.json || echo "No temporary payload files to clean up"'
             cleanWs()
         }
     }
