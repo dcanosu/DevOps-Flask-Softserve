@@ -107,20 +107,6 @@ pipeline {
             }
         }
 
-        stage('Ansible: Test Connectivity') {
-            steps {
-                script {
-                    // Use the converted WSL_WORKSPACE path to construct Ansible paths
-                    def wslInventoryPath = "${env.WSL_WORKSPACE}/infra/ansible/inventory.ini"
-                    def wslPlaybookPath = "${env.WSL_WORKSPACE}/infra/ansible/playbooks/test_connections.yml"
-
-                    withAWS(credentials: 'lowestpermissiontester', region: 'sa-east-1') {
-                        sh "wsl ansible-playbook -i ${wslInventoryPath} ${wslPlaybookPath}"
-                    }
-                }
-            }
-        }
-
         stage('Cleanup') {
             steps {
                 always {
