@@ -1,25 +1,27 @@
+############################
+# Instance EC2 -> Variables
+############################
+
 variable "aws_region" {
-  description = "AWS region to deploy EC2"
+  description = "AWS region where the EC2 instance will be deployed"
   type        = string
-  default     = "us-east-1" # N. Virgigina
+  default     = "us-east-1" # N. Virginia
+}
+
+variable "instance_name" {
+  description = "Tag to assign as the instance Name"
+  type        = string
 }
 
 variable "ami_id" {
   description = "The AMI ID used to launch the EC2 instance"
   type        = string
-  default     = "ami-0953476d60561c955" # Amazon linux 2023
 }
 
 variable "instance_type" {
   description = "The type of EC2 instance to launch (e.g., t2.micro)"
   type        = string
   default     = "t2.micro"
-}
-
-variable "instance_name" {
-  description = "Tag to assign as the instance Name"
-  type        = string
-	default     = "flask-app-dev"
 }
 
 variable "volume_size" {
@@ -40,21 +42,17 @@ variable "delete_on_termination" {
   default     = true
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key for EC2 access"
+variable "key_name" {
+  description = "The name of the key pair"
+  type        = string
+}
+
+variable "security_group_id" {
+  description = "ID del Security Group"
   type        = string
 }
 
 # variable "subnet_id" {
 #   description = "The Subnet ID where the instance will be launched"
-#   type        = string
-# }
-
-# variable "security_group_ids" {
-#   description = "List of Security Group IDs to associate with the instance"
-#   type        = list(string)
-# }
-# variable "key_name" {
-#   description = "The name of the SSH key pair to use for the instance"
 #   type        = string
 # }

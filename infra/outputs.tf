@@ -1,23 +1,35 @@
-########## EC2 ##########
+#########################
+# Instance EC2 -> Outputs
+#########################
 
-output "ec2_status" {
+output "status" {
   value = module.ec2_app_flask.status
 }
 
-output "ec2_instance_id" {
+output "instance_id" {
   value = module.ec2_app_flask.instance_id
 }
 
-output "ec2_public_ip" {
+output "public_ip" {
   value = module.ec2_app_flask.public_ip
 }
 
-########## RDS ##########
+###############################
+# RDS using postgres -> Outputs
+###############################
 
 output "rds_status" {
   value = module.rds_db_app_flask.status
 }
 
 output "rds_endpoint" {
-  value = module.rds_db_app_flask.endpoint
+  value = module.rds_db_app_flask.rds_endpoint
+}
+
+output "rds_db_name" {
+  value = module.rds_db_app_flask.rds_db_name
+}
+
+output "rds_port" {
+  value = module.rds_db_app_flask.rds_port
 }
