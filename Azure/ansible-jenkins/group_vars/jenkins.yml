@@ -1,0 +1,6 @@
+# This file defines variables that apply to the 'jenkins' group from the inventory.
+# You can store settings like Jenkins port, plugins, admin credentials, etc.
+
+jenkins_http_port: 8080
+jenkins_admin_user: jenkinsadmin
+jenkins_admin_password: jenkins123

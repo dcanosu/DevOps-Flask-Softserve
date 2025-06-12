@@ -1,94 +1,3 @@
-# ---
-# - name: Set up Flask App on Ubuntu Server
-#   hosts: ec2
-#   become: yes
-
-#   vars:
-#     app_dir: /var/wwww/app-flask
-#     venv_dir: "{{ app_dir }}/venv"
-#     requirements:
-#       - Flask==3.1.0
-#       - Flask-SQLAlchemy==3.1.1
-#       - psycopg2-binary
-#       - python-dotenv
-
-#   tasks:
-
-#     - name: Update and upgrade system packages
-#       apt:
-#         update_cache: yes
-#         upgrade: dist
-#         autoremove: yes
-
-#     - name: Install system dependencies for Python
-#       apt:
-#         name:
-#           - python3
-#           - python3-pip
-#           - python3-venv
-#         state: present
-
-#     - name: Create application directory
-#       file:
-#         path: "{{ app_dir }}"
-#         state: directory
-#         mode: '0755'
-#         owner: ubuntu
-#         group: ubuntu
-
-#     - name: Create Python virtual environment
-#       command: python3 -m venv "{{ venv_dir }}"
-#       args:
-#         creates: "{{ venv_dir }}"
-
-#     - name: Install Python dependencies in virtualenv
-#       pip:
-#         name: "{{ requirements }}"
-#         virtualenv: "{{ venv_dir }}"
-#         virtualenv_command: python3 -m venv
-
-#     - name: Copy Flask app to server
-#       copy:
-#         src: "{{ playbook_dir }}/../app/"
-#         dest: "{{ app_dir }}/"
-#         owner: ubuntu
-#         group: ubuntu
-#         mode: '0755'
-#         directory_mode: yes
-#     - name: Install additional system dependencies
-#       apt:
-#         name:
-#           - python3-dev
-#           - libpq-dev
-#           - nginx
-#           - postgresql
-#           - postgresql-contrib
-#         state: present
-
-#     - name: Create .env file with DB config
-#       copy:
-#         dest: "{{ app_dir }}/.env"
-#         content: |
-#           DATABASE_URL=postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/{{ db_name }}
-#         owner: ubuntu
-#         group: ubuntu
-#         mode: '0644'
-
-#     - name: Create PostgreSQL database
-#       become_user: postgres
-#       postgresql_db:
-#         name: "{{ db_name }}"
-
-#     - name: Run Flask DB migrations
-#       shell: |
-#         source "{{ venv_dir }}/bin/activate"
-#         flask db upgrade
-#       args:
-#         chdir: "{{ app_dir }}"
-#       environment:
-#         FLASK_APP: app.py
-
-
 ---
 - name: Set up Article Pool Flask App on Ubuntu Server
   hosts: ec2
@@ -101,11 +10,11 @@
     env_file: "{{ app_dir }}/.env"
     db_user: postgres
     db_password: postgres
-    db_host: your-rds-endpoint
+    db_host: db-app-flask.c87iueymmzz1.us-east-1.rds.amazonaws.com
     db_port: 5432
     db_name: db_app_flask
     secret_key: your-secure-secret-key
-    domain: artcilepoolsoftserve.live  # REVISAR el typo en "article"
+    domain: artcilepoolsoftserve.live 
 
   tasks:
     - name: Update and upgrade system packages
@@ -208,16 +117,6 @@
       notify:
         - Enable Nginx site
         - Restart Nginx
-
-    # - name: Run Flask DB migrations
-    #   shell: |
-    #     source "{{ venv_dir }}/bin/activate"
-    #     flask db upgrade
-    #     python3 -m app.create_db
-    #   args:
-    #     chdir: "{{ app_dir }}"
-    #   environment:
-    #     FLASK_APP: wsgi.py  # O cambiar según tu estructura
 
     - name: Run Flask DB migrations and create DB
       shell: |
