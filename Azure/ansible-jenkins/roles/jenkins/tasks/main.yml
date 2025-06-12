@@ -1,0 +1,54 @@
+# Main task list to install Jenkins.
+# It updates the package manager, adds Jenkins repo, installs Java and Jenkins,
+# and starts the Jenkins service.
+
+- name: Install required dependencies
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  loop:
+    - openjdk-17-jdk
+    - gnupg
+    - curl
+
+- name: Download Jenkins GPG key and add it to keyring
+  ansible.builtin.shell: |
+    curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | gpg --dearmor -o /usr/share/keyrings/jenkins-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/jenkins-keyring.gpg
+
+- name: Add Jenkins apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.gpg] https://pkg.jenkins.io/debian binary/"
+    state: present
+    filename: jenkins
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    state: present
+    update_cache: yes
+
+- name: Set JAVA_HOME to Java 17
+  lineinfile:
+    path: /etc/default/jenkins
+    line: 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
+    insertafter: EOF
+    state: present
+  notify: Restart jenkins
+
+- name: Ensure Jenkins is started and enabled
+  service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Show initial Jenkins admin password
+  command: cat /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_admin_password
+
+- name: Display initial Jenkins admin password
+  debug:
+    msg: "Initial Jenkins admin password is: {{ jenkins_admin_password.stdout }}"
+

@@ -1,0 +1,6 @@
+# Default values for the Jenkins role.
+# These values can be overridden by group_vars or extra_vars.
+
+jenkins_repo_url: http://pkg.jenkins.io/debian-stable
+jenkins_repo_key: https://pkg.jenkins.io/debian-stable/jenkins.io.key
+jenkins_port: 8080

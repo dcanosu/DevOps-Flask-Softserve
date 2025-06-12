@@ -1,0 +1,9 @@
+# This is the main Ansible playbook.
+# It targets the 'jenkins' group and applies the Jenkins role to install and configure it.
+
+- name: Install Jenkins on Ubuntu
+  hosts: jenkins
+  become: true
+
+  roles:
+    - jenkins

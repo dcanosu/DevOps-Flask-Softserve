@@ -3,9 +3,9 @@
 # Get the IP from Terraform output
 IP=$(terraform -chdir=../infra output -raw public_ip)
 
-# Verificar que la IP fue obtenida correctamente
+# Check the IP 
 if [[ -z "$IP" ]]; then
-  echo "❌ No se pudo obtener la IP pública. Asegúrate de haber aplicado Terraform correctamente."
+  echo "❌ we can't get the public ip."
   exit 1
 fi
 
