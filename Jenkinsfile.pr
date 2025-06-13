@@ -1,4 +1,8 @@
 pipeline {
+    parameters {
+        string(name: 'PR_BRANCH', defaultValue: '', description: 'The branch of the PR, passed from the upstream test job.')
+    }
+
     agent any
 
     environment {

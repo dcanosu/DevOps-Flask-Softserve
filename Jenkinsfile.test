@@ -1,0 +1,16 @@
+pipeline {
+		agent any
+		stages {
+			stage('Test') {
+				steps {
+					echo 'Installing dependencies and running tests...'
+				}
+			}
+		}
+		post {
+			success {
+				build job: 'Jenkinsfile.pr',
+							parameters: [string(name: 'PR_BRANCH', value: env.BRANCH_NAME)]
+			}
+		}
+}
