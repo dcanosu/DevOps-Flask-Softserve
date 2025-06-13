@@ -1,4 +1,9 @@
 pipeline {
+    parameters {
+        string(name: 'PASSED_CHANGE_ID', defaultValue: '', description: 'Pull Request ID passed from upstream job')
+        string(name: 'PASSED_CHANGE_URL', defaultValue: '', description: 'Pull Request URL passed from upstream job')
+    }
+
 
     agent any
 
@@ -48,7 +53,7 @@ pipeline {
 
         stage('Publish Plan to Gist and Comment on PR') {
             when {
-                expression { env.CHANGE_ID != null && env.CHANGE_URL != null }
+                expression { params.PASSED_CHANGE_ID != null && params.PASSED_CHANGE_ID != '' && params.PASSED_CHANGE_URL != null && params.PASSED_CHANGE_URL != '' }
             }
             steps {
                 script {
