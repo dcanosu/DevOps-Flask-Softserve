@@ -1,4 +1,8 @@
 pipeline {
+    agent any // Define agent at the top level if not already
+    options {
+        skipDefaultCheckout true
+    }
     parameters {
         string(name: 'PASSED_CHANGE_ID', defaultValue: '', description: 'Pull Request ID passed from upstream job')
         string(name: 'PASSED_CHANGE_URL', defaultValue: '', description: 'Pull Request URL passed from upstream job')
@@ -20,10 +24,28 @@ pipeline {
     }
 
     stages {
+        stage('Checkout PR Code') {
+            steps {
+                echo 'Attempting to checkout SCM details propagated from upstream...'
+                checkout scm
+                sh 'echo "--- After explicit checkout scm --- "'
+                sh 'echo "BRANCH_NAME: ${env.BRANCH_NAME}"'
+                sh 'echo "GIT_COMMIT: ${env.GIT_COMMIT}"'
+                sh 'echo "GIT_URL: ${env.GIT_URL}"'
+                sh 'echo "CHANGE_ID (from env): ${env.CHANGE_ID}"'
+                sh 'echo "CHANGE_URL (from env): ${env.CHANGE_URL}"'
+                sh 'echo "-----------------------------------"'
+            }
+        }
+
         stage('Log Branch Info') {
             steps {
-                sh 'echo "Running on branch: ${env.BRANCH_NAME}"'
-                sh 'echo "Running on commit: ${env.GIT_COMMIT}"'
+                sh 'echo "--- Jenkins Environment & Parameters --- "'
+                sh 'echo "env.BRANCH_NAME: ${env.BRANCH_NAME}"'
+                sh 'echo "env.GIT_COMMIT: ${env.GIT_COMMIT}"'
+                sh 'echo "params.PASSED_CHANGE_ID: ${params.PASSED_CHANGE_ID}"'
+                sh 'echo "params.PASSED_CHANGE_URL: ${params.PASSED_CHANGE_URL}"'
+                sh 'echo "-------------------------------------"'
             }
         }
 
