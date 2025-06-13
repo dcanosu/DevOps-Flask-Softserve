@@ -9,7 +9,7 @@ pipeline {
 		}
 		post {
 			success {
-				build(job: 'Terraform-PR-Pipeline', propagate: true, parameters: [
+				build(job: "Terraform-PR-Pipeline/${env.BRANCH_NAME}", propagate: true, parameters: [
                     string(name: 'PASSED_CHANGE_ID', value: env.CHANGE_ID ?: ''),
                     string(name: 'PASSED_CHANGE_URL', value: env.CHANGE_URL ?: '')
                 ])
