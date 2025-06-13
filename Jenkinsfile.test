@@ -9,17 +9,18 @@ pipeline {
 		}
 		post {
 			success {
-				when {
-                    expression { env.CHANGE_ID != null && env.CHANGE_ID != '' }
-                }
-                steps {
+				steps {
                     script {
-                        echo "Attempting to trigger downstream PR job for PR_ID: ${env.CHANGE_ID}"
-                        def changeUrlValue = env.CHANGE_URL ?: '' // Ensure graceful handling if CHANGE_URL could be null
-                        build(job: "Terraform-PR-Pipeline/PR-${env.CHANGE_ID}", propagate: true, parameters: [
-                            string(name: 'PASSED_CHANGE_ID', value: env.CHANGE_ID), 
-                            string(name: 'PASSED_CHANGE_URL', value: changeUrlValue)
-                        ])
+                        if (env.CHANGE_ID != null && env.CHANGE_ID != '') {
+                            echo "Attempting to trigger downstream PR job for PR_ID: ${env.CHANGE_ID}"
+                            def changeUrlValue = env.CHANGE_URL ?: '' // Ensure graceful handling if CHANGE_URL could be null
+                            build(job: "Terraform-PR-Pipeline/PR-${env.CHANGE_ID}", propagate: true, parameters: [
+                                string(name: 'PASSED_CHANGE_ID', value: env.CHANGE_ID), 
+                                string(name: 'PASSED_CHANGE_URL', value: changeUrlValue)
+                            ])
+                        } else {
+                            echo "Not a PR build (CHANGE_ID is not set or empty), skipping downstream trigger of Terraform-PR-Pipeline."
+                        }
                     }
                 }
 			}
