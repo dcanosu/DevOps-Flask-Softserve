@@ -13,12 +13,14 @@ pipeline {
                     expression { env.CHANGE_ID != null && env.CHANGE_ID != '' }
                 }
                 steps {
-                    echo "Attempting to trigger downstream PR job for PR_ID: ${env.CHANGE_ID}"
-                    def changeUrlValue = env.CHANGE_URL ?: '' // Ensure graceful handling if CHANGE_URL could be null
-                    build(job: "Terraform-PR-Pipeline/PR-${env.CHANGE_ID}", propagate: true, parameters: [
-                        string(name: 'PASSED_CHANGE_ID', value: env.CHANGE_ID), 
-                        string(name: 'PASSED_CHANGE_URL', value: changeUrlValue)
-                    ])
+                    script {
+                        echo "Attempting to trigger downstream PR job for PR_ID: ${env.CHANGE_ID}"
+                        def changeUrlValue = env.CHANGE_URL ?: '' // Ensure graceful handling if CHANGE_URL could be null
+                        build(job: "Terraform-PR-Pipeline/PR-${env.CHANGE_ID}", propagate: true, parameters: [
+                            string(name: 'PASSED_CHANGE_ID', value: env.CHANGE_ID), 
+                            string(name: 'PASSED_CHANGE_URL', value: changeUrlValue)
+                        ])
+                    }
                 }
 			}
 		}
