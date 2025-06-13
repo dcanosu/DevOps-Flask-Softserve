@@ -9,8 +9,7 @@ pipeline {
 		}
 		post {
 			success {
-				build job: 'Jenkinsfile.pr',
-							parameters: [string(name: 'PR_BRANCH', value: env.BRANCH_NAME)]
+				build job: 'Terraform-PR-Pipeline', propagate: true
 			}
 		}
 }

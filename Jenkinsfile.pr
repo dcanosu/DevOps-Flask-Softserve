@@ -1,7 +1,4 @@
 pipeline {
-    parameters {
-        string(name: 'PR_BRANCH', defaultValue: '', description: 'The branch of the PR, passed from the upstream test job.')
-    }
 
     agent any
 
@@ -18,6 +15,13 @@ pipeline {
     }
 
     stages {
+        stage('Log Branch Info') {
+            steps {
+                sh 'echo "Running on branch: ${env.BRANCH_NAME}"'
+                sh 'echo "Running on commit: ${env.GIT_COMMIT}"'
+            }
+        }
+
         stage('Initialize Terraform') {
             steps {
                 dir('infra') {
