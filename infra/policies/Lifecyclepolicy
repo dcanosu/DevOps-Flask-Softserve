@@ -1,0 +1,18 @@
+{
+  "Rules": [
+    {
+      "ID": "LogRetentionRule",
+      "Prefix": "logs/",
+      "Status": "Enabled",
+      "Expiration": {
+        "Days": 30
+      },
+      "Transitions": [
+        {
+          "Days": 7,
+          "StorageClass": "GLACIER"
+        }
+      ]
+    }
+  ]
+}
