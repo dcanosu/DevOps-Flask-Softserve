@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the IP from Terraform output
-IP=$(terraform -chdir=../infra output -raw public_ip)
+IP=$(terraform -chdir=../infra/infra-aws output -raw public_ip)
 
 # Check the IP 
 if [[ -z "$IP" ]]; then

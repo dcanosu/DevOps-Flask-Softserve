@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Configurable variables
-TERRAFORM_DIR="../infra-azure"
-INVENTORY_DIR="inventory"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+TERRAFORM_DIR="$PROJECT_ROOT/infra/infra-azure"
+# TERRAFORM_DIR="./infra/infra-azure"
+INVENTORY_DIR="$PROJECT_ROOT/ansible/ansible-jenkins/inventory"
 INVENTORY_FILE="${INVENTORY_DIR}/jenkins.ini"
-# HOST_NAME="Jenkins"
-# ANSIBLE_USER="jenkinsadmin"
 PRIVATE_KEY_PATH="~/.ssh/id_rsa"
 
 # Get the public IP from Terraform output
