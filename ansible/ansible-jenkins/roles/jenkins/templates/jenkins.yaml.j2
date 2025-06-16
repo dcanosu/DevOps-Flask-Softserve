@@ -1,0 +1,35 @@
+systemMessage: "🔥 Set up Jenkins by Ansible and JCasC"
+
+securityRealm:
+  local:
+    allowsSignup: false
+    users:
+      - id: "{{ jenkins_admin_user }}"
+        name: "Admin Jenkins"
+        password: "{{ jenkins_admin_password }}"
+
+authorizationStrategy:
+  loggedInUsersCanDoAnything:
+    allowAnonymousRead: false
+
+jobs:
+  - script: >
+      pipelineJob('{{ jenkins_pipeline_job_name }}') {
+        definition {
+          cps {
+            script("""
+              pipeline {
+                agent any
+                stages {
+                  stage('Clone') {
+                    steps {
+                      git '{{ jenkins_git_repo_url }}'
+                    }
+                  }
+                }
+              }
+            """.stripIndent())
+            sandbox()
+          }
+        }
+      }

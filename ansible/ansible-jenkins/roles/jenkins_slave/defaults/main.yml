@@ -1,0 +1,25 @@
+# Default values for the Jenkins role.
+# These values can be overridden by group_vars or extra_vars.
+
+# Python
+python_version: "3.10"
+python_repo: "ppa:deadsnakes/ppa"
+
+# Ansible
+ansible_repo: "ppa:ansible/ansible"
+
+# Terraform
+terraform_version: "1.6.6"
+terraform_zip_url: "https://releases.hashicorp.com/terraform/{{ terraform_version }}/terraform_{{ terraform_version }}_linux_amd64.zip"
+terraform_dest: "/tmp/terraform.zip"
+terraform_bin_path: "/usr/local/bin/terraform"
+
+# Java
+java_package: "openjdk-17-jdk"
+
+# Paquetes generales
+common_packages:
+  - software-properties-common
+  - curl
+  - unzip
+  - python3-pip

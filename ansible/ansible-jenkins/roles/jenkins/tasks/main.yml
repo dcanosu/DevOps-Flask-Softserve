@@ -1,0 +1,64 @@
+# Main task list to install Jenkins.
+# It updates the package manager, adds Jenkins repo, installs Java and Jenkins,
+# and starts the Jenkins service.
+
+# - name: Uninstall Jenkins (only for test)
+#   shell: |
+#     systemctl stop jenkins || true
+#     apt purge -y jenkins
+#     apt autoremove -y
+#     rm -rf /var/lib/jenkins /etc/default/jenkins /etc/apt/sources.list.d/jenkins.list
+#   become: true
+
+- name: Install required dependencies
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  loop:
+    - openjdk-17-jdk
+    - gnupg
+    - curl
+
+- name: Download Jenkins GPG key
+  ansible.builtin.shell: |
+    curl -fsSL {{ jenkins_repo_key_url }} | gpg --dearmor -o {{ jenkins_keyring_path }}
+  args:
+    creates: "{{ jenkins_keyring_path }}"
+
+- name: Add Jenkins APT repository
+  apt_repository:
+    repo: "deb [signed-by={{ jenkins_keyring_path }}] {{ jenkins_repo_url }} binary/"
+    state: present
+    filename: "{{ jenkins_repo_name }}"
+
+- name: Install Jenkins
+  apt:
+    name: "{{ jenkins_package }}"
+    state: present
+    update_cache: yes
+
+- name: Set JAVA_HOME in Jenkins default config
+  lineinfile:
+    path: /etc/default/jenkins
+    line: "JAVA_HOME={{ jenkins_java_home }}"
+    insertafter: EOF
+    state: present
+  notify: Restart Jenkins
+
+- name: Ensure Jenkins is started and enabled
+  service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Get initial Jenkins admin password
+  command: cat /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_admin_password
+
+- name: Show Jenkins initial admin password
+  debug:
+    msg: "🔑 Jenkins admin password: {{ jenkins_admin_password.stdout }}"
+
+# - name: Install plugins of Jenkins
+#   import_tasks: install_plugins.yml

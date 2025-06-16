@@ -1,0 +1,9 @@
+# Default values for the Jenkins role.
+# These values can be overridden by group_vars or extra_vars.
+
+jenkins_repo_url: "https://pkg.jenkins.io/debian"
+jenkins_repo_key_url: "https://pkg.jenkins.io/debian/jenkins.io-2023.key"
+jenkins_keyring_path: "/usr/share/keyrings/jenkins-keyring.gpg"
+jenkins_java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
+jenkins_package: "jenkins"
+jenkins_repo_name: "jenkins"
