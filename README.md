@@ -1,3 +1,5 @@
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=dcanosu_DevOps-Flask-Softserve)
+
 # 🚀 devops-flask
 
 Welcome to the **devops-flask** project.  
