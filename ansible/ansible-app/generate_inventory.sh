@@ -1,18 +1,55 @@
 #!/bin/bash
 
-# Get the IP from Terraform output
-IP=$(terraform -chdir=../infra/infra-aws output -raw public_ip)
+# if we get any error the script will stop
+set -euo pipefail
 
-# Check the IP 
+# Get the absolute path of the project root
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Configurable variables
+TERRAFORM_DIR="$PROJECT_ROOT/infra/infra-aws"
+INVENTORY_DIR="$PROJECT_ROOT/ansible/ansible-app/inventory"
+INVENTORY_FILE="${INVENTORY_DIR}/app.ini"
+PRIVATE_KEY_PATH="~/.ssh/terraform_key"
+
+# Telegram
+TELEGRAM_BOT_TOKEN=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMBOTTOKEN" --query value -o tsv)
+TELEGRAM_CHAT_ID=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMCHATID" --query value -o tsv)
+DEPLOY_MESSAGE="✅ Ansible apply completed successfully at $(date '+%Y-%m-%d %H:%M:%S'). App is ready."
+
+# Get the public IP from Terraform output
+echo "🔍 Getting public IP from Terraform output..."
+IP=$(terraform -chdir="$TERRAFORM_DIR" output -raw public_ip)
+
+# Validate that the IP was retrieved successfully
 if [[ -z "$IP" ]]; then
-  echo "❌ we can't get the public ip."
+  echo "❌ we can't get the public ip from Terraform output."
   exit 1
 fi
 
 # Generate Ansible inventory
-cat <<EOF > inventory.ini
-[ec2]
+cat <<EOF > "$INVENTORY_FILE"
+[app]
 app-flask ansible_host=${IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/terraform_key
 EOF
 
-echo "✅ Inventory created for IP: $IP"
+echo "✅ Inventory file created at: $INVENTORY_FILE"
+echo "📍 App address IP: $IP"
+
+# Run Ansible Playbook
+echo "🚀 Running Ansible playbook to install App dependencies..."
+ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_ROOT/ansible/ansible-app/playbook.yml"
+
+# Notify via Telegram if successful
+if [[ $? -eq 0 ]]; then
+  echo "📣 Notifying Ansible success..."
+  curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "chat_id": "'"${TELEGRAM_CHAT_ID}"'",
+      "text": "'"${DEPLOY_MESSAGE}"'"
+    }'
+else
+  echo "❌ Ansible playbook failed. No notification sent."
+  exit 1
+fi
