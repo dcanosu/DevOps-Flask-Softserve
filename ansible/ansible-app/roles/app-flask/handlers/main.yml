@@ -1,0 +1,24 @@
+# Handlers are triggered by tasks using the "notify" directive.
+# Typically used to restart services after config changes.
+
+- name: Reload systemd
+  command: systemctl daemon-reexec
+
+- name: Enable and start Gunicorn
+  systemd:
+    name: article_pool
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/article_pool
+    dest: /etc/nginx/sites-enabled/article_pool
+    state: link
+    force: yes
+
+- name: Restart Nginx
+  systemd:
+    name: nginx
+    state: restarted

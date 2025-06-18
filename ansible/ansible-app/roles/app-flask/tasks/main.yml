@@ -1,0 +1,80 @@
+- name: Update and install dependencies
+  apt:
+    update_cache: yes
+    upgrade: dist
+    autoremove: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - nginx
+      - postgresql-client
+      - libpq-dev
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Ensure application directory exists
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+
+- name: Clone Flask app repository
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_dir }}"
+    version: HEAD
+    force: yes
+
+- name: Create Python virtual environment
+  command: python3 -m venv "{{ venv_dir }}"
+  args:
+    creates: "{{ venv_dir }}"
+
+- name: Install Python dependencies
+  pip:
+    requirements: "{{ app_dir }}/requirements.txt"
+    virtualenv: "{{ venv_dir }}"
+
+- name: Create .env file for Flask
+  copy:
+    dest: "{{ env_file }}"
+    content: |
+      export FLASK_ENV="production"
+      export SECRET_KEY="{{ secret_key }}"
+      export DATABASE_URL="postgresql://{{ db_user }}:{{ db_password }}@{{ db_host }}:{{ db_port }}/{{ db_name }}"
+    owner: ubuntu
+    group: ubuntu
+    mode: '0644'
+
+- name: Create Gunicorn systemd service
+  template:
+    src: article_pool.service.j2
+    dest: /etc/systemd/system/article_pool.service
+  notify:
+    - Reload systemd
+    - Enable and start Gunicorn
+
+- name: Configure Nginx for the app
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/article_pool
+  notify:
+    - Enable Nginx site
+    - Restart Nginx
+
+- name: Run Flask DB migrations
+  shell: |
+    . "{{ venv_dir }}/bin/activate"
+    export FLASK_APP=app.py
+    flask db upgrade
+    python3 -m app.create_db
+  args:
+    chdir: "{{ app_dir }}"
+    executable: /bin/bash

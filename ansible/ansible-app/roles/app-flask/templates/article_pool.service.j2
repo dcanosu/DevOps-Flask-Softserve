@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn instance to serve Article Pool Flask app
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory={{ app_dir }}
+Environment="PATH={{ venv_dir }}/bin"
+EnvironmentFile={{ env_file }}
+ExecStart={{ venv_dir }}/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:application
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
