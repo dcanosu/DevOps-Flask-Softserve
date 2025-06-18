@@ -5,7 +5,7 @@
 resource "aws_security_group" "flask_sg" {
   name        = var.name_ec2_sg
   description = var.description
-  #vpc_id      = var.vpc_id
+  # vpc_id      = var.vpc_id
 
   ingress {
     description = "SSH from anywhere"
@@ -51,17 +51,15 @@ resource "aws_security_group" "flask_sg" {
 resource "aws_security_group" "rds_sg" {
   name        = "rds-sg"
   description = "Allow DB access only from EC2 SG"
+  # vpc_id      = var.vpc_id
 
-  dynamic "ingress" {
-    for_each = var.ec2_security_group_id != null ? [var.ec2_security_group_id] : []
-    content {
-      description     = "Allow PostgreSQL access from EC2 instance"
-      from_port       = var.postgres_port
-      to_port         = var.postgres_port
-      protocol        = var.tcp_protocol
-      security_groups = [ingress.value]
-    }
-  }
+  ingress {
+  description     = "Allow PostgreSQL access from EC2"
+  from_port       = var.postgres_port
+  to_port         = var.postgres_port
+  protocol        = var.tcp_protocol
+  security_groups = [aws_security_group.flask_sg.id]
+}
 
   egress {
     description = "Allow all outbound"

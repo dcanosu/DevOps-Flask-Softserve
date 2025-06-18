@@ -11,8 +11,7 @@ resource "aws_db_instance" "db_app_flask" {
   instance_class       = var.instance_class
   username             = var.username
   password             = var.password
-  # vpc_security_group_ids = [var.db_sg_id]
-  # db_subnet_group_name   = var.db_subnet_group_name
+  vpc_security_group_ids  = [var.db_sg_id]
   
   skip_final_snapshot  = true
   publicly_accessible  = false

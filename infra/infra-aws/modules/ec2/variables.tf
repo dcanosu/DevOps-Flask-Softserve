@@ -51,8 +51,3 @@ variable "security_group_id" {
   description = "ID del Security Group"
   type        = string
 }
-
-# variable "subnet_id" {
-#   description = "The Subnet ID where the instance will be launched"
-#   type        = string
-# }

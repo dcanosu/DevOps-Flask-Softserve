@@ -80,7 +80,7 @@ variable "allowed_cidr_blocks_egress" {
 variable "name_rds_sg" {
   description = "Name of the RDS security group"
   type        = string
-  default = "rds-App-sg"
+  default = "rds-app-sg"
 }
 
 variable "ec2_security_group_id" {

@@ -38,5 +38,5 @@ module "rds" {
   db_name                = var.db_name
   username               = var.username
   password               = var.password
-  ec2_security_group_id = module.security_group_flask.security_group_id
+  db_sg_id                = module.security_group_flask.rds_security_group_id
 }

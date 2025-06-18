@@ -54,12 +54,12 @@ variable "ec2_security_group_id" {
   default     = null
 }
 
-# variable "db_sg_id" {
-#   description = "The security group ID that allows access to RDS"
+# variable "vpc_id" {
+#   description = "VPC ID where RDS will be deployed"
 #   type        = string
 # }
 
-# variable "db_subnet_group_name" {
-#   description = "Subnet group for RDS"
-#   type        = string
-# }
+variable "db_sg_id" {
+  description = "The security group ID that allows access to RDS"
+  type        = string
+}

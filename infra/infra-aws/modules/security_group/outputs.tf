@@ -7,7 +7,7 @@ output "security_group_id" {
   value       = aws_security_group.flask_sg.id
 }
 
-# output "rds_sg_id" {
-#   description = "The ID of the security group for RDS"
-#   value       = aws_security_group.rds_sg.id
-# }
+output "rds_security_group_id" {
+  description = "The ID of the security group for RDS"
+  value       = aws_security_group.rds_sg.id
+}
