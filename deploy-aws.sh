@@ -9,7 +9,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$PROJECT_ROOT/infra/infra-aws"
 ANSIBLE_DIR="$PROJECT_ROOT/ansible/ansible-app"
 
-# Telegram
+# Telegram secrets
 TELEGRAM_BOT_TOKEN=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMBOTTOKEN" --query value -o tsv)
 TELEGRAM_CHAT_ID=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMCHATID" --query value -o tsv)
 # DEPLOY_MESSAGE="✅ Terraform apply completed successfully at $(date '+%Y-%m-%d %H:%M:%S'). AWS - Infrastructure is ready."
@@ -23,7 +23,7 @@ terraform apply -auto-approve
 
 IP=$(terraform -chdir="$TERRAFORM_DIR" output -raw public_ip)
 
-# ✅ Mensaje de éxito de Terraform
+# Succes message
 DEPLOY_SUCCESS_MESSAGE=$(cat <<EOF
 ✅ *Terraform Deployment Report*
 📦 *Module:* \`infra-aws\`  
@@ -33,7 +33,7 @@ DEPLOY_SUCCESS_MESSAGE=$(cat <<EOF
 EOF
 )
 
-# ❌ Mensaje de error de Terraform
+# Error message
 DEPLOY_ERROR_MESSAGE=$(cat <<EOF
 ❌ *Terraform Deployment Report*
 📦 *Module:* \`infra-aws\`  
