@@ -380,3 +380,7 @@ terraform.rc
 
 ## Sh set up keyvault
 setup-keyvault.sh
+setup-keyvault-aws.sh
+
+## Group ansible vars
+app.yml

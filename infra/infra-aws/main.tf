@@ -13,6 +13,15 @@ provider "aws" {
   region = var.aws_region
 }
 
+module "security_group_flask" {
+  source  = "./modules/security_group"
+}
+
+module "key_pair" {
+  source = "./modules/key_pair"
+  ssh_public_key = file("~/.ssh/terraform_key.pub")
+}
+
 module "ec2_app_flask" {
   source             = "./modules/ec2"
   ami_id             = var.ami_id
@@ -21,15 +30,6 @@ module "ec2_app_flask" {
   volume_size        = var.volume_size
   key_name           = module.key_pair.key_name
   security_group_id  = module.security_group_flask.security_group_id
-}
-
-module "security_group_flask" {
-  source  = "./modules/security_group"
-}
-
-module "key_pair" {
-  source = "./modules/key_pair"
-  ssh_public_key = file("~/.ssh/terraform_key.pub")
 }
 
 module "rds" {

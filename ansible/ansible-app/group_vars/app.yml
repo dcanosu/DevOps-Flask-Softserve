@@ -3,10 +3,12 @@ app_dir: /var/www/article_pool
 repo_url: https://github.com/dcanosu/DevOps-Flask-Softserve.git
 venv_dir: "{{ app_dir }}/venv"
 env_file: "{{ app_dir }}/.env"
-db_user: postgres
-db_password: postgres
-db_host: db-app-flask.c87iueymmzz1.us-east-1.rds.amazonaws.com:5432
-db_port: 5432
-db_name: db_app_flask
-secret_key: file("~/.ssh/terraform_key.pub"
+db_user: postgres #
+db_password: postgres #
+db_host: db-app-flask.c87iueymmzz1.us-east-1.rds.amazonaws.com #
+db_port: 5432 #
+db_name: db_app_flask #
+secret_key: "{{ lookup('file', '~/.ssh/terraform_key.pub') }}"
 domain: artcilepoolsoftserve.live
+
+### Terraform state 

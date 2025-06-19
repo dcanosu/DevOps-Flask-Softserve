@@ -10,10 +10,11 @@ TERRAFORM_DIR="$PROJECT_ROOT/infra/infra-azure"
 ANSIBLE_DIR="$PROJECT_ROOT/ansible/ansible-jenkins"
 INVENTORY_FILE="$ANSIBLE_DIR/inventory/jenkins.ini"
 PLAYBOOK_FILE="$ANSIBLE_DIR/playbook.yml"
+
 # Telegram
 TELEGRAM_BOT_TOKEN=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMBOTTOKEN" --query value -o tsv)
 TELEGRAM_CHAT_ID=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMCHATID" --query value -o tsv)
-DEPLOY_MESSAGE="✅ Terraform apply completed successfully at $(date '+%Y-%m-%d %H:%M:%S'). Infrastructure is ready."
+DEPLOY_MESSAGE="✅ Terraform apply completed successfully at $(date '+%Y-%m-%d %H:%M:%S'). AZURE - Infrastructure is ready."
 
 echo "🧱 Initializing and applying Terraform configuration..."
 cd "$TERRAFORM_DIR"

@@ -6,16 +6,16 @@ set -euo pipefail
 # Get the absolute path of the project root
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-# Configurable variables
+# Configurable paths
 TERRAFORM_DIR="$PROJECT_ROOT/infra/infra-aws"
 INVENTORY_DIR="$PROJECT_ROOT/ansible/ansible-app/inventory"
 INVENTORY_FILE="${INVENTORY_DIR}/app.ini"
 PRIVATE_KEY_PATH="~/.ssh/terraform_key"
 
-# Telegram
+# Telegram secrets from Azure
 TELEGRAM_BOT_TOKEN=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMBOTTOKEN" --query value -o tsv)
 TELEGRAM_CHAT_ID=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMCHATID" --query value -o tsv)
-DEPLOY_MESSAGE="✅ Ansible apply completed successfully at $(date '+%Y-%m-%d %H:%M:%S'). App is ready."
+# DEPLOY_MESSAGE="✅ Ansible apply completed successfully at $(date '+%Y-%m-%d %H:%M:%S'). App is ready."
 
 # Get the public IP from Terraform output
 echo "🔍 Getting public IP from Terraform output..."
@@ -27,7 +27,28 @@ if [[ -z "$IP" ]]; then
   exit 1
 fi
 
+DEPLOY_SUCCESS_MESSAGE=$(cat <<EOF
+🚀 *Ansible Deployment Report*
+📦 *Role:* \`app-flask\`  
+🌍 *IP:* \`${IP:-N/A}\`  
+🕒 *Time:* $(date '+%Y-%m-%d %H:%M:%S')  
+✅ *Status:* Success. App is ready.
+EOF
+)
+
+# Error message
+DEPLOY_ERROR_MESSAGE=$(cat <<EOF
+🚀 *Ansible Deployment Report*
+📦 *Role:* \`app-flask\`  
+🌍 *IP:* \`${IP:-N/A}\`  
+🕒 *Time:* $(date '+%Y-%m-%d %H:%M:%S')  
+❌ *Status:* Failed during playbook execution.  
+🔍 Check logs on the server or CI pipeline.
+EOF
+)
+
 # Generate Ansible inventory
+echo "📥 Generating Ansible inventory..."
 cat <<EOF > "$INVENTORY_FILE"
 [app]
 app-flask ansible_host=${IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/terraform_key
@@ -38,18 +59,23 @@ echo "📍 App address IP: $IP"
 
 # Run Ansible Playbook
 echo "🚀 Running Ansible playbook to install App dependencies..."
-ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_ROOT/ansible/ansible-app/playbook.yml"
-
-# Notify via Telegram if successful
-if [[ $? -eq 0 ]]; then
+if ansible-playbook -i "$INVENTORY_FILE" "$PROJECT_ROOT/ansible/ansible-app/playbook.yml"; then
   echo "📣 Notifying Ansible success..."
   curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d '{
       "chat_id": "'"${TELEGRAM_CHAT_ID}"'",
-      "text": "'"${DEPLOY_MESSAGE}"'"
+      "text": "'"${DEPLOY_SUCCESS_MESSAGE}"'",
+      "parse_mode": "Markdown"
     }'
 else
-  echo "❌ Ansible playbook failed. No notification sent."
+  echo "❌ Ansible playbook failed. Notifying error..."
+  curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "chat_id": "'"${TELEGRAM_CHAT_ID}"'",
+      "text": "'"${DEPLOY_ERROR_MESSAGE}"'",
+      "parse_mode": "Markdown"
+    }'
   exit 1
 fi
