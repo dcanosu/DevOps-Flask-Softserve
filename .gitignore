@@ -383,4 +383,4 @@ setup-keyvault.sh
 setup-keyvault-aws.sh
 
 ## Group ansible vars
-app.yml
+ansible/ansible-app/group_vars/app.yml 
