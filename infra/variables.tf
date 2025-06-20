@@ -1,53 +1,90 @@
 ############################
-# Instance EC2 -> Variables
+# Virtual machine -> Jenkins
 ############################
 
-variable "aws_region" {
-  description = "AWS region to deploy EC2"
+# variable "name" {
+#   description = "The name of the virtual machine resource"
+#   type        = string
+# }
+
+variable "master_vm_name" {
+  description = "Name of the master Jenkins VM"
   type        = string
 }
 
-variable "instance_name" {
-  description = "Name tag for the EC2 instance"
+variable "slave_vm_name" {
+  description = "Name of the slave Jenkins VM"
   type        = string
 }
 
-variable "ami_id" {
-  description = "The AMI ID used to launch the EC2 instance"
+variable "location" {
+  description = "Azure location for resources"
   type        = string
 }
 
-variable "volume_size" {
-  description = "Size of the root EBS volume (in GiB)"
-  type        = number
-}
-
-variable "ssh_public_key" {
-  description = "SSH public key for EC2 access"
+variable "resource_group_name" {
+  description = "Name of the resource group"
   type        = string
 }
 
-# #################################
-# # RDS using postgres -> Variables
-# #################################
-
-variable "db_instance_identifier" {
-  description = "The unique identifier for the RDS PostgreSQL instance. Must be lowercase and without spaces."
+variable "admin_username" {
+  description = "Administrator username for the VM"
   type        = string
 }
 
-variable "db_name" {
-  description = "The name of the database to create when the DB instance is created."
+variable "admin_vm_slave" {
+  description = "Administrator username for the slave VM"
   type        = string
 }
 
-variable "username" {
-  description = "Username for the master DB user."
+variable "public_key_path" {
+  description = "Path to the public SSH key file"
   type        = string
 }
 
-variable "password" {
-  description = "Password for the master DB user. Marked as sensitive for security."
+variable "role_master" {
+  description = "Rol of the Jenkins Vm"
   type        = string
-  sensitive   = true
+}
+
+variable "role_slave" {
+  description = "Rol of the Jenkins Vm"
+  type        = string
+}
+
+################################
+# Variables for Network security
+################################
+
+variable "nsg_name" {
+  description = "Name of the Network Security Group"
+  type        = string
+}
+
+################################
+# Network Interface -> Variables
+################################
+
+variable "master_network_interface_name" {
+  description = "The name of the virtual machine resource"
+  type        = string
+}
+
+variable "slave_network_interface_name" {
+  description = "The name of the virtual machine resource"
+  type        = string
+}
+
+########################
+# Public IP -> Variables
+########################
+
+variable "master_public_ip_name" {
+  description = "The name of the virtual machine resource"
+  type        = string
+}
+
+variable "slave_public_ip_name" {
+  description = "The name of the virtual machine resource"
+  type        = string
 }
