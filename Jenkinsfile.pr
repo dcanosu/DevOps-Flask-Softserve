@@ -41,6 +41,16 @@ pipeline {
         stage('Generate Terraform Plan for PR') {
             steps {
                 dir('infra') {
+												// ADD THESE LINES FOR DEBUGGING:
+											sh 'echo "--- Debug: Current directory ---"'
+											sh 'pwd'
+											sh 'echo "--- Debug: Listing files in infra directory ---"'
+											sh 'ls -la'
+											sh 'echo "--- Debug: Contents of infra/variables.tf ---"'
+											sh 'cat variables.tf || echo "variables.tf not found or content could not be displayed"'
+											sh 'echo "--- End Debug ---"'
+											// END OF DEBUG LINES
+
                     withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
                         sh 'terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan.pr -input=false'
                         sh 'terraform show -no-color tfplan.pr > tfplan.pr.txt'
