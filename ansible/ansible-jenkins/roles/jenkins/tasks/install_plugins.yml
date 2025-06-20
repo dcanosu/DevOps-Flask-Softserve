@@ -1,0 +1,61 @@
+- name: Create plugins directory if it doesn't exist
+  file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0755'
+
+- name: Define list of Jenkins plugins
+  vars:
+    jenkins_plugins:
+      - { id: configuration-as-code, url: https://updates.jenkins.io/latest/configuration-as-code.hpi }
+      - { id: git, url: https://updates.jenkins.io/latest/git.hpi }
+      - { id: commons-text-api, url: https://updates.jenkins.io/latest/commons-text-api.hpi }
+      - { id: json-api, url: https://updates.jenkins.io/latest/json-api.hpi }
+      - { id: prism-api, url: https://updates.jenkins.io/latest/prism-api.hpi }
+      - { id: caffeine-api, url: https://updates.jenkins.io/latest/caffeine-api.hpi }
+      - { id: snakeyaml-api, url: https://updates.jenkins.io/latest/snakeyaml-api.hpi }
+      - { id: script-security, url: https://updates.jenkins.io/latest/script-security.hpi }
+      - { id: credentials-binding, url: https://updates.jenkins.io/latest/credentials-binding.hpi }
+      - { id: mailer, url: https://updates.jenkins.io/latest/mailer.hpi }
+      - { id: structs, url: https://updates.jenkins.io/latest/structs.hpi }
+      - { id: ssh-credentials, url: https://updates.jenkins.io/latest/ssh-credentials.hpi }
+      - { id: git-client, url: https://updates.jenkins.io/latest/git-client.hpi }
+      - { id: workflow-scm-step, url: https://updates.jenkins.io/latest/workflow-scm-step.hpi }
+      - { id: workflow-step-api, url: https://updates.jenkins.io/latest/workflow-step-api.hpi }
+      - { id: scm-api, url: https://updates.jenkins.io/latest/scm-api.hpi }
+      - { id: credentials, url: https://updates.jenkins.io/latest/credentials.hpi }
+      - { id: display-url-api, url: https://updates.jenkins.io/latest/display-url-api.hpi }
+      - { id: asm-api, url: https://updates.jenkins.io/latest/asm-api.hpi }
+      - { id: instance-identity, url: https://updates.jenkins.io/latest/instance-identity.hpi }
+      - { id: jakarta-mail-api, url: https://updates.jenkins.io/latest/jakarta-mail-api.hpi }
+      - { id: bouncycastle-api, url: https://updates.jenkins.io/latest/bouncycastle-api.hpi }
+      - { id: plain-credentials, url: https://updates.jenkins.io/latest/plain-credentials.hpi }
+      - { id: variant, url: https://updates.jenkins.io/latest/variant.hpi }
+      - { id: apache-httpcomponents-client-4-api, url: https://updates.jenkins.io/latest/apache-httpcomponents-client-4-api.hpi }
+      - { id: gson-api, url: https://updates.jenkins.io/latest/gson-api.hpi }
+      - { id: mina-sshd-api-common, url: https://updates.jenkins.io/latest/mina-sshd-api-common.hpi }
+      - { id: mina-sshd-api-core, url: https://updates.jenkins.io/latest/mina-sshd-api-core.hpi }
+      - { id: jakarta-activation-api, url: https://updates.jenkins.io/latest/jakarta-activation-api.hpi }
+
+  block:
+    - name: Download plugins from Jenkins Update Center
+      get_url:
+        url: "{{ item.url }}"
+        dest: "/var/lib/jenkins/plugins/{{ item.id }}.jpi"
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+      loop: "{{ jenkins_plugins }}"
+      loop_control:
+        label: "{{ item.id }}"
+      notify: Restart Jenkins
+
+- name: Ensure correct permissions for all plugin files
+  file:
+    path: /var/lib/jenkins/plugins
+    state: directory
+    recurse: yes
+    owner: jenkins
+    group: jenkins

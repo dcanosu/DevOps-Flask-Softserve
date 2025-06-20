@@ -377,3 +377,10 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+## Sh set up keyvault
+setup-keyvault.sh
+setup-keyvault-aws.sh
+
+## Group ansible vars
+ansible/ansible-app/group_vars/app.yml 

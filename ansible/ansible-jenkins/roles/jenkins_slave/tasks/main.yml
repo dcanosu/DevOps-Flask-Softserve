@@ -1,0 +1,67 @@
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Add deadsnakes PPA for Python {{ python_version }}
+  apt_repository:
+    repo: "{{ python_repo }}"
+    state: present
+
+- name: Update apt cache after adding deadsnakes PPA
+  apt:
+    update_cache: yes
+
+- name: Install Python {{ python_version }} and development tools
+  apt:
+    name:
+      - "python{{ python_version }}"
+      - "python{{ python_version }}-venv"
+      - "python{{ python_version }}-dev"
+      - python3-pip
+    state: present
+
+- name: Ensure 'python3' points to Python {{ python_version }}
+  alternatives:
+    name: python3
+    path: "/usr/bin/python{{ python_version }}"
+    link: /usr/bin/python3
+    priority: 100
+    state: present
+
+- name: Add Ansible repository
+  apt_repository:
+    repo: "{{ ansible_repo }}"
+    state: present
+
+- name: Install Ansible
+  apt:
+    name: ansible
+    state: present
+    update_cache: yes
+
+- name: Install Java 17
+  apt:
+    name: "{{ java_package }}"
+    state: present
+
+- name: Download Terraform
+  get_url:
+    url: "{{ terraform_zip_url }}"
+    dest: "{{ terraform_dest }}"
+
+- name: Unzip Terraform binary
+  unarchive:
+    src: "{{ terraform_dest }}"
+    dest: /usr/local/bin/
+    remote_src: yes
+    creates: "{{ terraform_bin_path }}"
+
+- name: Set permissions for Terraform binary
+  file:
+    path: "{{ terraform_bin_path }}"
+    mode: '0755'

@@ -1,0 +1,7 @@
+# Handlers are triggered by tasks using the "notify" directive.
+# Typically used to restart services after config changes.
+
+- name: Restart Jenkins
+  service:
+    name: jenkins
+    state: restarted
