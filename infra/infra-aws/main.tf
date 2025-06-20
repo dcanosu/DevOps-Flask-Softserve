@@ -1,6 +1,13 @@
 terraform {
   required_version = ">= 1.3.0" # Ensures compatibility with Terraform v1.3 or higher
 
+  backend "azurerm" {
+    resource_group_name   = "terraform-rg"
+    storage_account_name  = "tfstateflaskapp"
+    container_name        = "tfstateaws"
+    key                   = "terraform.tfstate"
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws" # Official AWS provider
