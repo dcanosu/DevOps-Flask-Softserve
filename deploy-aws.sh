@@ -9,6 +9,9 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$PROJECT_ROOT/infra/infra-aws"
 ANSIBLE_DIR="$PROJECT_ROOT/ansible/ansible-app"
 
+echo "🔧 Running Azure backend setup..."
+"$TERRAFORM_DIR/setup-backend-azure.sh"
+
 # Telegram secrets
 TELEGRAM_BOT_TOKEN=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMBOTTOKEN" --query value -o tsv)
 TELEGRAM_CHAT_ID=$(az keyvault secret show --vault-name "telegram-secrets" --name "TELEGRAMCHATID" --query value -o tsv)
