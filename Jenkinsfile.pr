@@ -1,0 +1,171 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        SSH_PUBLIC_KEY        = credentials('EC2_SSH_KEY_PUBLIC') 
+        GITHUB_PAT            = credentials('github-token') 
+        TF_IN_AUTOMATION      = "true"
+    }
+
+    stages {
+        stage('Test') {
+            steps {
+                echo "Setting up Python virtual environment and running tests..."
+                sh '''
+                    python3 -m venv venv
+                    
+                    . venv/bin/activate
+                    
+                    pip install --upgrade pip
+                    
+                    pip install -r requirements.txt
+                    
+                    pip install -r requirements-dev.txt
+                    
+                    pytest
+                    
+                '''
+            }
+        }
+
+        stage('Initialize Terraform') {
+            steps {
+                dir('infra') {
+                    sh 'terraform init -input=false'
+                }
+            }
+        }
+
+        stage('Generate Terraform Plan for PR') {
+            steps {
+                dir('infra') {
+												// ADD THESE LINES FOR DEBUGGING:
+											sh 'echo "--- Debug: Current directory ---"'
+											sh 'pwd'
+											sh 'echo "--- Debug: Listing files in infra directory ---"'
+											sh 'ls -la'
+											sh 'echo "--- Debug: Contents of infra/variables.tf ---"'
+											sh 'cat variables.tf || echo "variables.tf not found or content could not be displayed"'
+											sh 'echo "--- End Debug ---"'
+											// END OF DEBUG LINES
+
+                    withCredentials([file(credentialsId: 'terraform-tfvars', variable: 'TFVARS_FILE')]) {
+                        sh 'terraform plan -var-file=$TFVARS_FILE -var="ssh_public_key=${SSH_PUBLIC_KEY}" -out tfplan.pr -input=false'
+                        sh 'terraform show -no-color tfplan.pr > tfplan.pr.txt'
+                    }
+                }
+
+                script {
+                    stash name: 'terraform-plan-pr', includes: 'infra/tfplan.pr.txt'
+                    echo "Terraform plan stashed."
+                }
+            }
+        }
+
+        stage('Publish Plan to Gist and Comment on PR') {
+            when {
+                expression { env.CHANGE_ID != null && env.CHANGE_ID != '' && env.CHANGE_URL != null && env.CHANGE_URL != '' }
+            }
+            steps {
+                script {
+                    def githubOwner = ''
+                    def githubRepo = ''
+                    
+                    if (env.CHANGE_URL) {
+                        def matcher = (env.CHANGE_URL =~ /github\.com\/([^\/]+)\/([^\/]+)\/pull\/\d+/)
+                        if (matcher.find()) {
+                            githubOwner = matcher[0][1]
+                            githubRepo = matcher[0][2]
+                            echo "GitHub Owner: ${githubOwner}, GitHub Repo: ${githubRepo}"
+                        } else {
+                            error "Could not extract owner/repository from CHANGE_URL: ${env.CHANGE_URL}"
+                        }
+                    } else {
+                        error "CHANGE_URL environment variable not found. Cannot determine GitHub repository."
+                    }
+
+                    unstash 'terraform-plan-pr'
+                    def planOutput = readFile 'infra/tfplan.pr.txt'
+                    def prNumber = env.CHANGE_ID
+                    def gistDescription = "Terraform Plan for PR #${prNumber} in ${githubRepo}"
+                    
+                    // Create Gist payload
+                    def gistPayloadJson = [
+                        description: gistDescription,
+                        public: false, // Creates a secret/private Gist. Change to true for public.
+                        files: [
+                            "terraform-plan-PR${prNumber}.txt": [ // Filename in Gist
+                                content: planOutput
+                            ]
+                        ]
+                    ]
+                    writeFile file: 'gist_payload.json', text: groovy.json.JsonOutput.toJson(gistPayloadJson)
+                    
+                    // Publish Gist
+                    def gistApiResponse = sh(
+                        script: """
+                            curl -s -X POST \
+                                 -H "Authorization: token ${env.GITHUB_PAT}" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 https://api.github.com/gists \
+                                 -d @gist_payload.json
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    def gistResponseData = readJSON text: gistApiResponse
+                    def gistUrl = gistResponseData.html_url
+
+                    if (gistUrl) {
+                        echo "Terraform plan published to Gist: ${gistUrl}"
+
+                        def commentBody = "Terraform plan for this PR has been generated and published to a Gist: [View Plan](${gistUrl})"
+                        def commentPayloadJson = [ body: commentBody ]
+                        writeFile file: 'comment_payload.json', text: groovy.json.JsonOutput.toJson(commentPayloadJson)
+
+                        // Comment on PR
+                        sh """
+                            curl -s -X POST \
+                                 -H "Authorization: token ${env.GITHUB_PAT}" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 "https://api.github.com/repos/${githubOwner}/${githubRepo}/issues/${prNumber}/comments" \
+                                 -d @comment_payload.json
+                        """
+                        echo "Comment posted to PR #${prNumber} with Gist link."
+                    } else {
+                        echo "Gist API Response: ${gistApiResponse}"
+                        error "Failed to create Gist or extract Gist URL."
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            dir('infra') {
+                sh 'rm -f tfplan.pr tfplan.pr.txt || echo "No temporary PR plan files to clean up in infra"'
+            }
+            sh 'rm -f gist_payload.json comment_payload.json || echo "No temporary payload files to clean up"'
+            cleanWs()
+        }
+				success {
+						sh """
+								curl -H "Content-Type: application/json" \
+										-X POST \
+										-d '{"content": "✅ Pipeline SUCCESS: ${env.JOB_NAME} [#${env.BUILD_NUMBER}] - ${env.BUILD_URL}"}' \
+										https://discord.com/api/webhooks/1385368107328999565/MVQIwxRjdccYIP8LKmjoWSHSScyysFmjMygyb8E1HiJoLGSJS94hEHirLWAtNxHJQpVT
+						"""
+				}
+				failure {
+						sh """
+								curl -H "Content-Type: application/json" \
+										-X POST \
+										-d '{"content": "❌ Pipeline FAILED: ${env.JOB_NAME} [#${env.BUILD_NUMBER}] - ${env.BUILD_URL}"}' \
+										https://discord.com/api/webhooks/1385368107328999565/MVQIwxRjdccYIP8LKmjoWSHSScyysFmjMygyb8E1HiJoLGSJS94hEHirLWAtNxHJQpVT
+						"""
+				}
+    }
+}
